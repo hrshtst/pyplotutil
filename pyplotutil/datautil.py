@@ -2,10 +2,14 @@
 
 from io import StringIO
 from pathlib import Path
+from typing import Sequence, overload
 
+import numpy as np
 import pandas as pd
 from pandas.api.types import is_string_dtype
 from pandas.io.parsers import TextFileReader
+
+NumericType = int | float | complex | np.number
 
 
 class BaseData(object):
@@ -69,3 +73,19 @@ class Data(BaseData):
         if is_string_dtype(self.dataframe.columns):
             for c in self.dataframe.columns:
                 setattr(self, str(c), getattr(self.dataframe, str(c)))
+
+    @overload
+    def param(self, col: str) -> NumericType:
+        ...
+
+    @overload
+    def param(self, col: list[str]) -> list[NumericType]:
+        ...
+
+    def param(self, col):
+        if isinstance(col, str):
+            return self.dataframe.at[0, col]
+        elif isinstance(col, Sequence):
+            return [self.dataframe.at[0, c] for c in col]
+        else:
+            raise TypeError(f"unsupported type: {type(col)}")

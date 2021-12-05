@@ -104,3 +104,15 @@ def test_data_attributes() -> None:
     pt.assert_series_equal(data.a, df.a)  # type: ignore
     pt.assert_series_equal(data.b, df.b)  # type: ignore
     pt.assert_series_equal(data.c, df.c)  # type: ignore
+
+
+def test_data_param() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.param("b") == 0.01
+
+
+def test_data_param_list() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.param(["c", "e"]) == [10.0, 100]
