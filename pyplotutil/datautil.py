@@ -2,7 +2,7 @@
 
 from io import StringIO
 from pathlib import Path
-from typing import Sequence, overload
+from typing import Any, Iterator, Sequence, Tuple, overload
 
 import numpy as np
 import pandas as pd
@@ -79,7 +79,7 @@ class Data(BaseData):
         ...
 
     @overload
-    def param(self, col: list[str]) -> list[NumericType]:
+    def param(self, col: list[str] | tuple[str]) -> list[NumericType]:
         ...
 
     def param(self, col):
@@ -89,3 +89,63 @@ class Data(BaseData):
             return [self.dataframe.at[0, c] for c in col]
         else:
             raise TypeError(f"unsupported type: {type(col)}")
+
+
+class DataSet(BaseData):
+    _datadict: dict[str, Data]
+    _groups: Any
+    _by: str
+
+    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
+        super().__init__()
+        self._datadict = {}
+        self._by = kwds.pop("by", "tag")
+
+        if isinstance(data, (str, Path)):
+            self._set_datapath(data)
+
+        if self.datapath is not None:
+            self._set_dataframe(pd.read_csv(self.datapath, **kwds))
+        elif isinstance(data, StringIO):
+            self._set_dataframe(pd.read_csv(data, **kwds))
+        elif isinstance(data, pd.DataFrame):
+            self._set_dataframe(data)
+        else:
+            raise TypeError(f"unsupported type: {type(data)}")
+
+        self._make_groups()
+
+    def __iter__(self) -> Iterator[Data]:
+        return iter(self._datadict.values())
+
+    def _make_groups(self):
+        if self._by in self.dataframe.columns:
+            self._groups = self.dataframe.groupby(self._by)
+            self._datadict = {
+                str(k): Data(self._groups.get_group(k).reset_index(drop=True))
+                for k in self._groups.groups.keys()
+            }
+        else:
+            self._datadict = {"0": Data(self.dataframe)}
+
+    @property
+    def datadict(self) -> dict[str, Data]:
+        return self._datadict
+
+    def keys(self) -> list[str]:
+        return list(self.datadict.keys())
+
+    def items(self) -> list[Tuple[str, Data]]:
+        return list(self.datadict.items())
+
+    def get(self, tag: str = None) -> Data:
+        if tag is None:
+            tag = self.keys()[0]
+        return self.datadict[tag]
+
+    def param(
+        self, col: str | list[str] | tuple[str], tag=None
+    ) -> NumericType | list[NumericType]:
+        if tag is None:
+            tag = self.keys()[0]
+        return self.datadict[tag].param(col)
