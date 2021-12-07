@@ -143,9 +143,21 @@ class DataSet(BaseData):
             tag = self.keys()[0]
         return self.datadict[tag]
 
-    def param(
-        self, col: str | list[str] | tuple[str], tag=None
-    ) -> NumericType | list[NumericType]:
+    @overload
+    def param(self, col: str, tag=None) -> NumericType:
+        ...
+
+    @overload
+    def param(self, col: list[str] | tuple[str], tag=None) -> list[NumericType]:
+        ...
+
+    def param(self, col, tag=None):
         if tag is None:
             tag = self.keys()[0]
-        return self.datadict[tag].param(col)
+
+        if isinstance(col, str):
+            return self.datadict[tag].dataframe.at[0, col]
+        elif isinstance(col, Sequence):
+            return [self.datadict[tag].dataframe.at[0, c] for c in col]
+        else:
+            raise TypeError(f"unsupported type: {type(col)}")

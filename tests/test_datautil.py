@@ -369,6 +369,17 @@ def test_dataset_param_list() -> None:
     assert dataset.param(["c", "d", "e"], "tag03") == [22, 23, 24]
 
 
+def test_dataset_param_list_split() -> None:
+    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    dataset = DataSet(csv_path)
+
+    a, b, c = dataset.param(["a", "b", "c"], "tag01")
+
+    assert a == 0
+    assert b == 1
+    assert c == 2
+
+
 def test_dataset_param_list_default() -> None:
     csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
     dataset = DataSet(csv_path)
