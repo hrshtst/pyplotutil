@@ -144,11 +144,11 @@ class DataSet(BaseData):
         return self.datadict[tag]
 
     @overload
-    def param(self, col: str, tag=None) -> NumericType:
+    def param(self, col: str, tag: str = None) -> NumericType:
         ...
 
     @overload
-    def param(self, col: list[str] | tuple[str], tag=None) -> list[NumericType]:
+    def param(self, col: list[str] | tuple[str], tag: str = None) -> list[NumericType]:
         ...
 
     def param(self, col, tag=None):
