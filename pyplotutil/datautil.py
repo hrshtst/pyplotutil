@@ -27,6 +27,13 @@ class BaseData(object):
 
     datapath = property(_get_datapath, _set_datapath)
 
+    def _get_datadir(self) -> Path | None:
+        if isinstance(self._datapath, Path):
+            return self._datapath.parent
+        return None
+
+    datadir = property(_get_datadir)
+
     def _set_dataframe(self, df: pd.DataFrame | TextFileReader) -> None:
         if isinstance(df, pd.DataFrame):
             self._dataframe = df

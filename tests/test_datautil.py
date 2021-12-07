@@ -49,6 +49,7 @@ def test_data_init_path(cls) -> None:
     data = Data(path)
 
     assert data.datapath == Path(csv_path)
+    assert data.datadir == Path(csv_dir_path)
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
@@ -59,6 +60,7 @@ def test_data_init_StringIO() -> None:
     data = Data(StringIO(test_data))
 
     assert data.datapath is None
+    assert data.datadir is None
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
@@ -70,6 +72,7 @@ def test_data_init_DataFrame() -> None:
         data = Data(expected_df)
 
         assert data.datapath is None
+        assert data.datadir is None
         pt.assert_frame_equal(data.dataframe, expected_df)
     else:
         pytest.skip(f"Expected DataFram type: {type(expected_df)}")
@@ -149,6 +152,7 @@ def test_dataset_init_path(cls) -> None:
     dataset = DataSet(path)
 
     assert dataset.datapath == Path(csv_path)
+    assert dataset.datadir == Path(csv_dir_path)
     pt.assert_frame_equal(dataset.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
@@ -176,6 +180,7 @@ def test_dataset_init_StringIO() -> None:
     dataset = DataSet(StringIO(test_dataset))
 
     assert dataset.datapath is None
+    assert dataset.datadir is None
     pt.assert_frame_equal(dataset.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
@@ -205,6 +210,7 @@ def test_dataset_init_DataFrame() -> None:
         groups = raw_df.groupby("tag")
 
         assert dataset.datapath is None
+        assert dataset.datadir is None
         pt.assert_frame_equal(dataset.dataframe, raw_df)
         pt.assert_frame_equal(
             dataset._datadict["tag01"].dataframe,
@@ -229,6 +235,7 @@ def test_dataset_non_default_tag() -> None:
     dataset = DataSet(csv_path, by="label")
 
     assert dataset.datapath == Path(csv_path)
+    assert dataset.datadir == Path(csv_dir_path)
     pt.assert_frame_equal(dataset.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("label")
