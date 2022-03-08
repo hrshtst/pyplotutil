@@ -145,17 +145,19 @@ class DataSet(BaseData):
     def items(self) -> list[Tuple[str, Data]]:
         return list(self.datadict.items())
 
-    def get(self, tag: str = None) -> Data:
+    def get(self, tag: str | None = None) -> Data:
         if tag is None:
             tag = self.keys()[0]
         return self.datadict[tag]
 
     @overload
-    def param(self, col: str, tag: str = None) -> NumericType:
+    def param(self, col: str, tag: str | None = None) -> NumericType:
         ...
 
     @overload
-    def param(self, col: list[str] | tuple[str], tag: str = None) -> list[NumericType]:
+    def param(
+        self, col: list[str] | tuple[str], tag: str | None = None
+    ) -> list[NumericType]:
         ...
 
     def param(self, col, tag=None):
