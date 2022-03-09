@@ -296,6 +296,12 @@ def test_dataset_keys() -> None:
     assert dataset.keys() == ["tag01", "tag02", "tag03"]
 
 
+def test_dataset_tags() -> None:
+    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    dataset = DataSet(csv_path)
+    assert dataset.tags() == ["tag01", "tag02", "tag03"]
+
+
 def test_dataset_items() -> None:
     csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
     dataset = DataSet(csv_path)

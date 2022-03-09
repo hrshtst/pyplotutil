@@ -142,6 +142,9 @@ class DataSet(BaseData):
     def keys(self) -> list[str]:
         return list(self.datadict.keys())
 
+    def tags(self) -> list[str]:
+        return self.keys()
+
     def items(self) -> list[Tuple[str, Data]]:
         return list(self.datadict.items())
 
