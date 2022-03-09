@@ -131,6 +131,34 @@ def test_data_attributes() -> None:
     pt.assert_series_equal(data.c, df.c)  # type: ignore
 
 
+def test_data_min() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.min("a") == 1
+    assert data.min("d") == 3.5
+
+
+def test_data_min_list() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.min(["a", "b", "c"]) == [1, 0.01, 10.0]
+    assert data.min(["b", "d", "c", "e"]) == [0.01, 3.5, 10.0, 100]
+
+
+def test_data_max() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.max("b") == 0.04
+    assert data.max("c") == 40.0
+
+
+def test_data_max_list() -> None:
+    csv_path = os.path.join(csv_dir_path, "test.csv")
+    data = Data(csv_path)
+    assert data.max(["a", "b", "c"]) == [4, 0.04, 40.0]
+    assert data.max(["b", "d", "c", "e"]) == [0.04, 11.5, 40.0, 400]
+
+
 def test_data_param() -> None:
     csv_path = os.path.join(csv_dir_path, "test.csv")
     data = Data(csv_path)

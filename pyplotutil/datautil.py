@@ -82,6 +82,38 @@ class Data(BaseData):
                 setattr(self, str(c), getattr(self.dataframe, str(c)))
 
     @overload
+    def min(self, col: str) -> NumericType:
+        ...
+
+    @overload
+    def min(self, col: list[str]) -> list[NumericType]:
+        ...
+
+    def min(self, col):
+        if isinstance(col, str):
+            return self.dataframe[col].min()
+        elif isinstance(col, Sequence):
+            return [self.dataframe[c].min() for c in col]
+        else:
+            raise TypeError(f"unsupported type: {type(col)}")
+
+    @overload
+    def max(self, col: str) -> NumericType:
+        ...
+
+    @overload
+    def max(self, col: list[str]) -> list[NumericType]:
+        ...
+
+    def max(self, col):
+        if isinstance(col, str):
+            return self.dataframe[col].max()
+        elif isinstance(col, Sequence):
+            return [self.dataframe[c].max() for c in col]
+        else:
+            raise TypeError(f"unsupported type: {type(col)}")
+
+    @overload
     def param(self, col: str) -> NumericType:
         ...
 
