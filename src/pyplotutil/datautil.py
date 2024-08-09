@@ -1,18 +1,23 @@
-# -*- coding: utf-8 -*-
+# ruff: noqa: ANN001,ANN003,PLR2004,T201,PD008
 
+from __future__ import annotations
+
+from collections.abc import Iterator, Sequence
 from io import StringIO
 from pathlib import Path
-from typing import Any, Iterator, Sequence, Tuple, overload
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_string_dtype
-from pandas.io.parsers import TextFileReader
+
+if TYPE_CHECKING:
+    from pandas.io.parsers import TextFileReader
 
 NumericType = int | float | complex | np.number
 
 
-class BaseData(object):
+class BaseData:
     _datapath: Path | None
     _dataframe: pd.DataFrame
 
@@ -38,7 +43,8 @@ class BaseData(object):
         if isinstance(df, pd.DataFrame):
             self._dataframe = df
         else:
-            raise TypeError(f"unsupported type: {type(df)}")
+            msg = f"unsupported type: {type(df)}"
+            raise TypeError(msg)
 
     def _get_dataframe(self) -> pd.DataFrame:
         return self._dataframe
@@ -53,7 +59,7 @@ class Data(BaseData):
     def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
         super().__init__()
 
-        if isinstance(data, (str, Path)):
+        if isinstance(data, str | Path):
             self._set_datapath(data)
 
         if self.datapath is not None:
@@ -63,7 +69,8 @@ class Data(BaseData):
         elif isinstance(data, pd.DataFrame):
             self._set_dataframe(data)
         else:
-            raise TypeError(f"unsupported type: {type(data)}")
+            msg = f"unsupported type: {type(data)}"
+            raise TypeError(msg)
 
         self._set_attributes()
 
@@ -73,7 +80,7 @@ class Data(BaseData):
     def __len__(self) -> int:
         return len(self.dataframe)
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str):  # noqa: ANN204
         return getattr(self.dataframe, name)
 
     def _set_attributes(self) -> None:
@@ -82,52 +89,49 @@ class Data(BaseData):
                 setattr(self, str(c), getattr(self.dataframe, str(c)))
 
     @overload
-    def min(self, col: str) -> NumericType:
-        ...
+    def min(self, col: str) -> NumericType: ...
 
     @overload
-    def min(self, col: list[str]) -> list[NumericType]:
-        ...
+    def min(self, col: list[str]) -> list[NumericType]: ...
 
     def min(self, col):
         if isinstance(col, str):
             return self.dataframe[col].min()
-        elif isinstance(col, Sequence):
+        elif isinstance(col, Sequence):  # noqa: RET505
             return [self.dataframe[c].min() for c in col]
         else:
-            raise TypeError(f"unsupported type: {type(col)}")
+            msg = f"unsupported type: {type(col)}"
+            raise TypeError(msg)
 
     @overload
-    def max(self, col: str) -> NumericType:
-        ...
+    def max(self, col: str) -> NumericType: ...
 
     @overload
-    def max(self, col: list[str]) -> list[NumericType]:
-        ...
+    def max(self, col: list[str]) -> list[NumericType]: ...
 
     def max(self, col):
         if isinstance(col, str):
             return self.dataframe[col].max()
-        elif isinstance(col, Sequence):
+        elif isinstance(col, Sequence):  # noqa: RET505
             return [self.dataframe[c].max() for c in col]
         else:
-            raise TypeError(f"unsupported type: {type(col)}")
+            msg = f"unsupported type: {type(col)}"
+            raise TypeError(msg)
 
     @overload
-    def param(self, col: str) -> NumericType:
-        ...
+    def param(self, col: str) -> NumericType: ...
 
     @overload
-    def param(self, col: list[str] | tuple[str]) -> list[NumericType]:
-        ...
+    def param(self, col: list[str] | tuple[str]) -> list[NumericType]: ...
 
     def param(self, col):
         if isinstance(col, str):
             return self.dataframe.at[0, col]
-        elif isinstance(col, Sequence):
+        elif isinstance(col, Sequence):  # noqa: RET505
             return [self.dataframe.at[0, c] for c in col]
         else:
-            raise TypeError(f"unsupported type: {type(col)}")
+            msg = f"unsupported type: {type(col)}"
+            raise TypeError(msg)
 
 
 class DataSet(BaseData):
@@ -140,7 +144,7 @@ class DataSet(BaseData):
         self._datadict = {}
         self._by = kwds.pop("by", "tag")
 
-        if isinstance(data, (str, Path)):
+        if isinstance(data, str | Path):
             self._set_datapath(data)
 
         if self.datapath is not None:
@@ -150,19 +154,19 @@ class DataSet(BaseData):
         elif isinstance(data, pd.DataFrame):
             self._set_dataframe(data)
         else:
-            raise TypeError(f"unsupported type: {type(data)}")
+            msg = f"unsupported type: {type(data)}"
+            raise TypeError(msg)
 
         self._make_groups()
 
     def __iter__(self) -> Iterator[Data]:
         return iter(self._datadict.values())
 
-    def _make_groups(self):
+    def _make_groups(self) -> None:
         if self._by in self.dataframe.columns:
             self._groups = self.dataframe.groupby(self._by)
             self._datadict = {
-                str(k): Data(self._groups.get_group(k).reset_index(drop=True))
-                for k in self._groups.groups.keys()
+                str(k): Data(self._groups.get_group(k).reset_index(drop=True)) for k in self._groups.groups
             }
         else:
             self._datadict = {"0": Data(self.dataframe)}
@@ -177,7 +181,7 @@ class DataSet(BaseData):
     def tags(self) -> list[str]:
         return self.keys()
 
-    def items(self) -> list[Tuple[str, Data]]:
+    def items(self) -> list[tuple[str, Data]]:
         return list(self.datadict.items())
 
     def get(self, tag: str | None = None) -> Data:
@@ -186,14 +190,10 @@ class DataSet(BaseData):
         return self.datadict[tag]
 
     @overload
-    def param(self, col: str, tag: str | None = None) -> NumericType:
-        ...
+    def param(self, col: str, tag: str | None = None) -> NumericType: ...
 
     @overload
-    def param(
-        self, col: list[str] | tuple[str], tag: str | None = None
-    ) -> list[NumericType]:
-        ...
+    def param(self, col: list[str] | tuple[str], tag: str | None = None) -> list[NumericType]: ...
 
     def param(self, col, tag=None):
         if tag is None:
@@ -201,7 +201,8 @@ class DataSet(BaseData):
 
         if isinstance(col, str):
             return self.datadict[tag].dataframe.at[0, col]
-        elif isinstance(col, Sequence):
+        elif isinstance(col, Sequence):  # noqa: RET505
             return [self.datadict[tag].dataframe.at[0, c] for c in col]
         else:
-            raise TypeError(f"unsupported type: {type(col)}")
+            msg = f"unsupported type: {type(col)}"
+            raise TypeError(msg)

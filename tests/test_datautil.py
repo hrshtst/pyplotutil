@@ -1,4 +1,6 @@
-import os
+# ruff: noqa: ANN001,ANN003,PLR2004,T201,PGH003,PD901,PD008,PD009
+from __future__ import annotations
+
 from io import StringIO
 from pathlib import Path
 
@@ -7,7 +9,7 @@ import pandas._testing as pt
 import pytest
 from pyplotutil.datautil import Data, DataSet
 
-csv_dir_path = os.path.join(os.path.dirname(__file__), "data")
+csv_dir_path = Path(__file__).parent / "data"
 
 test_data = """\
 a,b,c,d,e
@@ -42,7 +44,7 @@ tag03,225,226,227,228,229
 
 @pytest.mark.parametrize("cls", [str, Path])
 def test_data_init_path(cls) -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     path = cls(csv_path)
     expected_df = pd.read_csv(csv_path)
 
@@ -54,7 +56,7 @@ def test_data_init_path(cls) -> None:
 
 
 def test_data_init_StringIO() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
     data = Data(StringIO(test_data))
@@ -65,7 +67,7 @@ def test_data_init_StringIO() -> None:
 
 
 def test_data_init_DataFrame() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
     if isinstance(expected_df, pd.DataFrame):
@@ -79,15 +81,15 @@ def test_data_init_DataFrame() -> None:
 
 
 def test_data_init_kwds() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
-    expected_df = pd.read_csv(csv_path, usecols=[0, 1])
+    csv_path = csv_dir_path / "test.csv"
+    expected_df = pd.read_csv(csv_path, usecols=[0, 1])  # type: ignore
     data = Data(csv_path, usecols=[0, 1])
     assert len(data.dataframe.columns) == 2
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
 def test_data_getitem() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])
+    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
     data = Data(df)
 
     pt.assert_series_equal(data["a"], df.a)  # type: ignore
@@ -105,14 +107,14 @@ def test_data_getitem_no_header() -> None:
 
 
 def test_data_len() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])
+    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
     data = Data(df)
 
     assert len(data) == len(df)
 
 
 def test_data_getattr() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])
+    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
     data = Data(df)
 
     pt.assert_index_equal(data.columns, pd.Index(["a", "b", "c"]))
@@ -123,7 +125,7 @@ def test_data_getattr() -> None:
 
 
 def test_data_attributes() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])
+    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
     data = Data(df)
 
     pt.assert_series_equal(data.a, df.a)  # type: ignore
@@ -132,48 +134,48 @@ def test_data_attributes() -> None:
 
 
 def test_data_min() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.min("a") == 1
     assert data.min("d") == 3.5
 
 
 def test_data_min_list() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.min(["a", "b", "c"]) == [1, 0.01, 10.0]
     assert data.min(["b", "d", "c", "e"]) == [0.01, 3.5, 10.0, 100]
 
 
 def test_data_max() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.max("b") == 0.04
     assert data.max("c") == 40.0
 
 
 def test_data_max_list() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.max(["a", "b", "c"]) == [4, 0.04, 40.0]
     assert data.max(["b", "d", "c", "e"]) == [0.04, 11.5, 40.0, 400]
 
 
 def test_data_param() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.param("b") == 0.01
 
 
 def test_data_param_list() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.param(["c", "e"]) == [10.0, 100]
 
 
 @pytest.mark.parametrize("cls", [str, Path])
 def test_dataset_init_path(cls) -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     path = cls(csv_path)
     raw_df = pd.read_csv(csv_path)
 
@@ -184,7 +186,7 @@ def test_dataset_init_path(cls) -> None:
     pt.assert_frame_equal(dataset.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        datadict = dataset._datadict
+        datadict = dataset.datadict
         pt.assert_frame_equal(
             datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
@@ -202,7 +204,7 @@ def test_dataset_init_path(cls) -> None:
 
 
 def test_dataset_init_StringIO() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     raw_df = pd.read_csv(csv_path)
 
     dataset = DataSet(StringIO(test_dataset))
@@ -212,7 +214,7 @@ def test_dataset_init_StringIO() -> None:
     pt.assert_frame_equal(dataset.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        datadict = dataset._datadict
+        datadict = dataset.datadict
         pt.assert_frame_equal(
             datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
@@ -230,7 +232,7 @@ def test_dataset_init_StringIO() -> None:
 
 
 def test_dataset_init_DataFrame() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     raw_df = pd.read_csv(csv_path)
 
     if isinstance(raw_df, pd.DataFrame):
@@ -241,15 +243,15 @@ def test_dataset_init_DataFrame() -> None:
         assert dataset.datadir is None
         pt.assert_frame_equal(dataset.dataframe, raw_df)
         pt.assert_frame_equal(
-            dataset._datadict["tag01"].dataframe,
+            dataset.datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset._datadict["tag02"].dataframe,
+            dataset.datadict["tag02"].dataframe,
             groups.get_group("tag02").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset._datadict["tag03"].dataframe,
+            dataset.datadict["tag03"].dataframe,
             groups.get_group("tag03").reset_index(drop=True),
         )
     else:
@@ -257,7 +259,7 @@ def test_dataset_init_DataFrame() -> None:
 
 
 def test_dataset_non_default_tag() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset_label.csv")
+    csv_path = csv_dir_path / "test_dataset_label.csv"
     raw_df = pd.read_csv(csv_path)
 
     dataset = DataSet(csv_path, by="label")
@@ -268,15 +270,15 @@ def test_dataset_non_default_tag() -> None:
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("label")
         pt.assert_frame_equal(
-            dataset._datadict["label01"].dataframe,
+            dataset.datadict["label01"].dataframe,
             groups.get_group("label01").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset._datadict["label02"].dataframe,
+            dataset.datadict["label02"].dataframe,
             groups.get_group("label02").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset._datadict["label03"].dataframe,
+            dataset.datadict["label03"].dataframe,
             groups.get_group("label03").reset_index(drop=True),
         )
     else:
@@ -284,7 +286,7 @@ def test_dataset_non_default_tag() -> None:
 
 
 def test_dataset_no_tag() -> None:
-    csv_path = os.path.join(csv_dir_path, "test.csv")
+    csv_path = csv_dir_path / "test.csv"
     raw_df = pd.read_csv(csv_path)
 
     dataset = DataSet(csv_path)
@@ -297,7 +299,7 @@ def test_dataset_no_tag() -> None:
 
 
 def test_dataset_iter() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     raw_df = pd.read_csv(csv_path)
 
@@ -305,33 +307,34 @@ def test_dataset_iter() -> None:
         groups = raw_df.groupby("tag")
         for i, data in enumerate(dataset):
             pt.assert_frame_equal(
-                data.dataframe, groups.get_group(f"tag{i+1:02d}").reset_index(drop=True)
+                data.dataframe,
+                groups.get_group(f"tag{i+1:02d}").reset_index(drop=True),
             )
     else:
         pytest.skip(f"Expected DataFram type: {type(raw_df)}")
 
 
 def test_dataset_property_datadict() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     assert isinstance(dataset.datadict, dict)
     assert list(dataset.datadict.keys()) == ["tag01", "tag02", "tag03"]
 
 
 def test_dataset_keys() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     assert dataset.keys() == ["tag01", "tag02", "tag03"]
 
 
 def test_dataset_tags() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     assert dataset.tags() == ["tag01", "tag02", "tag03"]
 
 
 def test_dataset_items() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     raw_df = pd.read_csv(csv_path)
 
@@ -346,14 +349,15 @@ def test_dataset_items() -> None:
             data = tup[1]
             assert tag == f"tag{i+1:02d}"
             pt.assert_frame_equal(
-                data.dataframe, groups.get_group(tag).reset_index(drop=True)
+                data.dataframe,
+                groups.get_group(tag).reset_index(drop=True),
             )
     else:
         pytest.skip(f"Expected DataFram type: {type(raw_df)}")
 
 
 def test_dataset_get() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     raw_df = pd.read_csv(csv_path)
 
@@ -362,14 +366,15 @@ def test_dataset_get() -> None:
         for tag in ["tag01", "tag02", "tag03"]:
             data = dataset.get(tag)
             pt.assert_frame_equal(
-                data.dataframe, groups.get_group(tag).reset_index(drop=True)
+                data.dataframe,
+                groups.get_group(tag).reset_index(drop=True),
             )
     else:
         pytest.skip(f"Expected DataFram type: {type(raw_df)}")
 
 
 def test_dataset_get_default() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
     raw_df = pd.read_csv(csv_path)
 
@@ -377,14 +382,15 @@ def test_dataset_get_default() -> None:
         groups = raw_df.groupby("tag")
         data = dataset.get()
         pt.assert_frame_equal(
-            data.dataframe, groups.get_group("tag01").reset_index(drop=True)
+            data.dataframe,
+            groups.get_group("tag01").reset_index(drop=True),
         )
     else:
         pytest.skip(f"Expected DataFram type: {type(raw_df)}")
 
 
 def test_dataset_param() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
 
     assert dataset.param("a", "tag01") == 0
@@ -393,7 +399,7 @@ def test_dataset_param() -> None:
 
 
 def test_dataset_param_default() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
 
     assert dataset.param("a") == 0
@@ -402,7 +408,7 @@ def test_dataset_param_default() -> None:
 
 
 def test_dataset_param_list() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
 
     assert dataset.param(["a", "b", "c"], "tag01") == [0, 1, 2]
@@ -411,7 +417,7 @@ def test_dataset_param_list() -> None:
 
 
 def test_dataset_param_list_split() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
 
     a, b, c = dataset.param(["a", "b", "c"], "tag01")
@@ -422,7 +428,7 @@ def test_dataset_param_list_split() -> None:
 
 
 def test_dataset_param_list_default() -> None:
-    csv_path = os.path.join(csv_dir_path, "test_dataset.csv")
+    csv_path = csv_dir_path / "test_dataset.csv"
     dataset = DataSet(csv_path)
 
     assert dataset.param(["a", "b", "c", "d", "e"]) == [0, 1, 2, 3, 4]
