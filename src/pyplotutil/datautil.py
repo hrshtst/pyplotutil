@@ -206,3 +206,8 @@ class DataSet(BaseData):
         else:
             msg = f"unsupported type: {type(col)}"
             raise TypeError(msg)
+
+
+# Local Variables:
+# jinx-local-words: "noqa"
+# End:

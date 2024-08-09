@@ -77,7 +77,7 @@ def test_data_init_DataFrame() -> None:
         assert data.datadir is None
         pt.assert_frame_equal(data.dataframe, expected_df)
     else:
-        pytest.skip(f"Expected DataFram type: {type(expected_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(expected_df)}")
 
 
 def test_data_init_kwds() -> None:
@@ -200,7 +200,7 @@ def test_dataset_init_path(cls) -> None:
             groups.get_group("tag03").reset_index(drop=True),
         )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_init_StringIO() -> None:
@@ -228,7 +228,7 @@ def test_dataset_init_StringIO() -> None:
             groups.get_group("tag03").reset_index(drop=True),
         )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_init_DataFrame() -> None:
@@ -255,7 +255,7 @@ def test_dataset_init_DataFrame() -> None:
             groups.get_group("tag03").reset_index(drop=True),
         )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_non_default_tag() -> None:
@@ -282,7 +282,7 @@ def test_dataset_non_default_tag() -> None:
             groups.get_group("label03").reset_index(drop=True),
         )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_no_tag() -> None:
@@ -295,7 +295,7 @@ def test_dataset_no_tag() -> None:
         assert len(dataset.datadict) == 1
         pt.assert_frame_equal(dataset.datadict["0"].dataframe, raw_df)
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_iter() -> None:
@@ -311,7 +311,7 @@ def test_dataset_iter() -> None:
                 groups.get_group(f"tag{i+1:02d}").reset_index(drop=True),
             )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_property_datadict() -> None:
@@ -353,7 +353,7 @@ def test_dataset_items() -> None:
                 groups.get_group(tag).reset_index(drop=True),
             )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_get() -> None:
@@ -370,7 +370,7 @@ def test_dataset_get() -> None:
                 groups.get_group(tag).reset_index(drop=True),
             )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_get_default() -> None:
@@ -386,7 +386,7 @@ def test_dataset_get_default() -> None:
             groups.get_group("tag01").reset_index(drop=True),
         )
     else:
-        pytest.skip(f"Expected DataFram type: {type(raw_df)}")
+        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
 def test_dataset_param() -> None:
@@ -432,3 +432,8 @@ def test_dataset_param_list_default() -> None:
     dataset = DataSet(csv_path)
 
     assert dataset.param(["a", "b", "c", "d", "e"]) == [0, 1, 2, 3, 4]
+
+
+# Local Variables:
+# jinx-local-words: "cls csv dataset noqa"
+# End:
