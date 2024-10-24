@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pandas._testing as pt
 import pytest
+
 from pyplotutil.datautil import Data, DataSet
 
 csv_dir_path = Path(__file__).parent / "data"
