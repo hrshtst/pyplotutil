@@ -1,4 +1,3 @@
-# ruff: noqa: ANN001,ANN003,PLR2004,T201,PD008
 
 from __future__ import annotations
 
@@ -80,7 +79,7 @@ class Data(BaseData):
     def __len__(self) -> int:
         return len(self.dataframe)
 
-    def __getattr__(self, name: str):  # noqa: ANN204
+    def __getattr__(self, name: str):
         return getattr(self.dataframe, name)
 
     def _set_attributes(self) -> None:
@@ -97,7 +96,7 @@ class Data(BaseData):
     def min(self, col):
         if isinstance(col, str):
             return self.dataframe[col].min()
-        elif isinstance(col, Sequence):  # noqa: RET505
+        elif isinstance(col, Sequence):
             return [self.dataframe[c].min() for c in col]
         else:
             msg = f"unsupported type: {type(col)}"
@@ -112,7 +111,7 @@ class Data(BaseData):
     def max(self, col):
         if isinstance(col, str):
             return self.dataframe[col].max()
-        elif isinstance(col, Sequence):  # noqa: RET505
+        elif isinstance(col, Sequence):
             return [self.dataframe[c].max() for c in col]
         else:
             msg = f"unsupported type: {type(col)}"
@@ -127,7 +126,7 @@ class Data(BaseData):
     def param(self, col):
         if isinstance(col, str):
             return self.dataframe.at[0, col]
-        elif isinstance(col, Sequence):  # noqa: RET505
+        elif isinstance(col, Sequence):
             return [self.dataframe.at[0, c] for c in col]
         else:
             msg = f"unsupported type: {type(col)}"
@@ -201,7 +200,7 @@ class TaggedData(BaseData):
 
         if isinstance(col, str):
             return self.datadict[tag].dataframe.at[0, col]
-        elif isinstance(col, Sequence):  # noqa: RET505
+        elif isinstance(col, Sequence):
             return [self.datadict[tag].dataframe.at[0, c] for c in col]
         else:
             msg = f"unsupported type: {type(col)}"
