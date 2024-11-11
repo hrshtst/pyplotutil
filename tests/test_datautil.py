@@ -1,4 +1,13 @@
 # ruff: noqa: S101
+"""Unit Tests for the Data Handling and Manipulation Module.
+
+This test suite verifies the functionality of the `Data` and `TaggedData` classes, which facilitate
+the management and manipulation of tabular data in pandas DataFrames. The tests cover class
+initialization, attribute access, data indexing, and various utility methods to ensure robust and
+consistent behavior in data handling and processing.
+
+"""
+
 from __future__ import annotations
 
 from io import StringIO
@@ -45,6 +54,7 @@ tag03,225,226,227,228,229
 
 @pytest.mark.parametrize("obj", [str, Path])
 def test_data_init_path(obj: type) -> None:
+    """Test the initialization of a `Data` object from a file path."""
     csv_path = csv_dir_path / "test.csv"
     path = obj(csv_path)
     expected_df = pd.read_csv(csv_path)
@@ -57,6 +67,7 @@ def test_data_init_path(obj: type) -> None:
 
 
 def test_data_init_StringIO() -> None:  # noqa: N802
+    """Test the initialization of a `Data` object from a `StringIO` object."""
     csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
@@ -68,6 +79,7 @@ def test_data_init_StringIO() -> None:  # noqa: N802
 
 
 def test_data_init_DataFrame() -> None:  # noqa: N802
+    """Test the initialization of a `Data` object from a pandas DataFrame."""
     csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
@@ -82,6 +94,7 @@ def test_data_init_DataFrame() -> None:  # noqa: N802
 
 
 def test_data_init_kwds() -> None:
+    """Test initialization with keyword arguments to customize DataFrame loading."""
     csv_path = csv_dir_path / "test.csv"
     cols = pd.Series([0, 1])
     expected_df = pd.read_csv(csv_path, usecols=cols)
@@ -92,12 +105,14 @@ def test_data_init_kwds() -> None:
 
 @pytest.fixture
 def toy_dataframe() -> pd.DataFrame:
+    """Return a toy DataFrame."""
     raw_data = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
     columns = pd.Series(["a", "b", "c"])
     return pd.DataFrame(raw_data, columns=columns)
 
 
 def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
+    """Test column access via indexing on `Data` objects."""
     data = Data(toy_dataframe)
 
     pt.assert_series_equal(data["a"], toy_dataframe.a)
@@ -106,6 +121,7 @@ def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
 
 
 def test_data_getitem_no_header() -> None:
+    """Test column access in DataFrames without a header."""
     toy_dataframe_no_header = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
     data = Data(toy_dataframe_no_header)
 
@@ -115,12 +131,14 @@ def test_data_getitem_no_header() -> None:
 
 
 def test_data_len(toy_dataframe: pd.DataFrame) -> None:
+    """Test length access via the `__len__` method."""
     data = Data(toy_dataframe)
 
     assert len(data) == len(toy_dataframe)
 
 
 def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
+    """Test attribute-style access to DataFrame attributes."""
     data = Data(toy_dataframe)
 
     pt.assert_index_equal(data.columns, pd.Index(["a", "b", "c"]))
@@ -135,6 +153,7 @@ def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
 
 
 def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
+    """Test direct attribute access for columns."""
     data = Data(toy_dataframe)
 
     pt.assert_series_equal(data.a, toy_dataframe.a)
@@ -150,6 +169,7 @@ def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
     ],
 )
 def test_data_min(col: str, expected: float) -> None:
+    """Test minimum value retrieval from specified columns."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.min(col) == expected
@@ -163,6 +183,7 @@ def test_data_min(col: str, expected: float) -> None:
     ],
 )
 def test_data_min_list(cols: list[str], expected: list[float]) -> None:
+    """Test minimum value retrieval from multiple columns."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.min(cols) == expected
@@ -176,6 +197,7 @@ def test_data_min_list(cols: list[str], expected: list[float]) -> None:
     ],
 )
 def test_data_max(col: str, expected: float) -> None:
+    """Test maximum value retrieval from specified columns."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.max(col) == expected
@@ -189,6 +211,7 @@ def test_data_max(col: str, expected: float) -> None:
     ],
 )
 def test_data_max_list(cols: list[str], expected: list[float]) -> None:
+    """Test maximum value retrieval from multiple columns."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.max(cols) == expected
@@ -201,6 +224,7 @@ def test_data_max_list(cols: list[str], expected: list[float]) -> None:
     ],
 )
 def test_data_param(col: str, expected: float) -> None:
+    """Test parameter retrieval for a specified column."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.param(col) == expected
@@ -213,6 +237,7 @@ def test_data_param(col: str, expected: float) -> None:
     ],
 )
 def test_data_param_list(cols: list[str], expected: list[float]) -> None:
+    """Test parameter retrieval from multiple columns."""
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
     assert data.param(cols) == expected
@@ -220,6 +245,7 @@ def test_data_param_list(cols: list[str], expected: list[float]) -> None:
 
 @pytest.mark.parametrize("obj", [str, Path])
 def test_tagged_data_init_path(obj: type) -> None:
+    """Test initialization of `TaggedData` from a file path."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     path = obj(csv_path)
     raw_df = pd.read_csv(csv_path)
@@ -249,6 +275,7 @@ def test_tagged_data_init_path(obj: type) -> None:
 
 
 def test_tagged_data_init_StringIO() -> None:  # noqa: N802
+    """Test initialization of `TaggedData` from a `StringIO` object."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -277,6 +304,7 @@ def test_tagged_data_init_StringIO() -> None:  # noqa: N802
 
 
 def test_tagged_data_init_DataFrame() -> None:  # noqa: N802
+    """Test initialization of `TaggedData` from a DataFrame."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -304,6 +332,7 @@ def test_tagged_data_init_DataFrame() -> None:  # noqa: N802
 
 
 def test_tagged_data_non_default_tag() -> None:
+    """Test tagged data grouping with a custom tag column."""
     csv_path = csv_dir_path / "test_tagged_data_label.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -331,6 +360,7 @@ def test_tagged_data_non_default_tag() -> None:
 
 
 def test_tagged_data_no_tag() -> None:
+    """Test `TaggedData` initialization without a tag column."""
     csv_path = csv_dir_path / "test.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -344,6 +374,7 @@ def test_tagged_data_no_tag() -> None:
 
 
 def test_tagged_data_iter() -> None:
+    """Test iteration over `TaggedData` groups."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
@@ -360,6 +391,7 @@ def test_tagged_data_iter() -> None:
 
 
 def test_tagged_data_property_datadict() -> None:
+    """Test access to the `datadict` property in `TaggedData`."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     assert isinstance(tagged_data.datadict, dict)
@@ -367,18 +399,21 @@ def test_tagged_data_property_datadict() -> None:
 
 
 def test_tagged_data_keys() -> None:
+    """Test retrieval of group keys in `TaggedData`."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     assert tagged_data.keys() == ["tag01", "tag02", "tag03"]
 
 
 def test_tagged_data_tags() -> None:
+    """Test retrieval of unique tags in `TaggedData`."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     assert tagged_data.tags() == ["tag01", "tag02", "tag03"]
 
 
 def test_tagged_data_items() -> None:
+    """Test the `items` method to retrieve data groups and associated tags."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
@@ -403,6 +438,7 @@ def test_tagged_data_items() -> None:
 
 
 def test_tagged_data_get() -> None:
+    """Test retrieval of a data group by tag."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
@@ -420,6 +456,7 @@ def test_tagged_data_get() -> None:
 
 
 def test_tagged_data_get_default() -> None:
+    """Test retrieval of the default data group."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
@@ -444,6 +481,7 @@ def test_tagged_data_get_default() -> None:
     ],
 )
 def test_tagged_data_param(col: str, tag: str, expected: float) -> None:
+    """Test parameter retrieval from a tagged group."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
@@ -459,6 +497,7 @@ def test_tagged_data_param(col: str, tag: str, expected: float) -> None:
     ],
 )
 def test_tagged_data_param_default(col: str, expected: float) -> None:
+    """Test parameter retrieval with the default tag."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
@@ -474,6 +513,7 @@ def test_tagged_data_param_default(col: str, expected: float) -> None:
     ],
 )
 def test_tagged_data_param_list(cols: list[str], tag: str, expected: list[float]) -> None:
+    """Test parameter retrieval for multiple columns from a tagged group."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
@@ -481,6 +521,7 @@ def test_tagged_data_param_list(cols: list[str], tag: str, expected: list[float]
 
 
 def test_tagged_data_param_list_split() -> None:
+    """Test unpacking multiple column parameters from a tagged group."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
@@ -492,6 +533,7 @@ def test_tagged_data_param_list_split() -> None:
 
 
 def test_tagged_data_param_list_default() -> None:
+    """Test parameter retrieval from multiple columns with the default tag."""
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
@@ -499,5 +541,5 @@ def test_tagged_data_param_list_default() -> None:
 
 
 # Local Variables:
-# jinx-local-words: "cls csv noqa"
+# jinx-local-words: "StringIO cls csv datadict len noqa"
 # End:
