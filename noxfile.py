@@ -1,3 +1,4 @@
+# ruff: noqa: D100,D103
 from __future__ import annotations
 
 import os
@@ -45,5 +46,5 @@ def tests(session: nox.Session) -> None:
 
 
 # Local Variables:
-# jinx-local-words: "dev pytest uv virtualenv"
+# jinx-local-words: "dev noqa pytest uv virtualenv"
 # End:
