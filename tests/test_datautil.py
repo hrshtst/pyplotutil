@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001,ANN003,PLR2004,T201,PGH003,PD901,PD008,PD009
+# ruff: noqa: S101
 from __future__ import annotations
 
 from io import StringIO
@@ -43,10 +43,10 @@ tag03,225,226,227,228,229
 """
 
 
-@pytest.mark.parametrize("cls", [str, Path])
-def test_data_init_path(cls) -> None:
+@pytest.mark.parametrize("obj", [str, Path])
+def test_data_init_path(obj: type) -> None:
     csv_path = csv_dir_path / "test.csv"
-    path = cls(csv_path)
+    path = obj(csv_path)
     expected_df = pd.read_csv(csv_path)
 
     data = Data(path)
@@ -56,7 +56,7 @@ def test_data_init_path(cls) -> None:
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
-def test_data_init_StringIO() -> None:
+def test_data_init_StringIO() -> None:  # noqa: N802
     csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
@@ -67,7 +67,7 @@ def test_data_init_StringIO() -> None:
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
-def test_data_init_DataFrame() -> None:
+def test_data_init_DataFrame() -> None:  # noqa: N802
     csv_path = csv_dir_path / "test.csv"
     expected_df = pd.read_csv(csv_path)
 
@@ -83,101 +83,145 @@ def test_data_init_DataFrame() -> None:
 
 def test_data_init_kwds() -> None:
     csv_path = csv_dir_path / "test.csv"
-    expected_df = pd.read_csv(csv_path, usecols=[0, 1])  # type: ignore
-    data = Data(csv_path, usecols=[0, 1])
-    assert len(data.dataframe.columns) == 2
+    cols = pd.Series([0, 1])
+    expected_df = pd.read_csv(csv_path, usecols=cols)
+    data = Data(csv_path, usecols=cols)
+    assert len(data.dataframe.columns) == len(cols)
     pt.assert_frame_equal(data.dataframe, expected_df)
 
 
-def test_data_getitem() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
-    data = Data(df)
+@pytest.fixture
+def toy_dataframe() -> pd.DataFrame:
+    raw_data = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+    columns = pd.Series(["a", "b", "c"])
+    return pd.DataFrame(raw_data, columns=columns)
 
-    pt.assert_series_equal(data["a"], df.a)  # type: ignore
-    pt.assert_series_equal(data["b"], df.b)  # type: ignore
-    pt.assert_series_equal(data["c"], df.c)  # type: ignore
+
+def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
+    data = Data(toy_dataframe)
+
+    pt.assert_series_equal(data["a"], toy_dataframe.a)
+    pt.assert_series_equal(data["b"], toy_dataframe.b)
+    pt.assert_series_equal(data["c"], toy_dataframe.c)
 
 
 def test_data_getitem_no_header() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
-    data = Data(df)
+    toy_dataframe_no_header = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+    data = Data(toy_dataframe_no_header)
 
-    pt.assert_series_equal(data[0], df[0])  # type: ignore
-    pt.assert_series_equal(data[1], df[1])  # type: ignore
-    pt.assert_series_equal(data[2], df[2])  # type: ignore
-
-
-def test_data_len() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
-    data = Data(df)
-
-    assert len(data) == len(df)
+    pt.assert_series_equal(data[0], toy_dataframe_no_header[0])
+    pt.assert_series_equal(data[1], toy_dataframe_no_header[1])
+    pt.assert_series_equal(data[2], toy_dataframe_no_header[2])
 
 
-def test_data_getattr() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
-    data = Data(df)
+def test_data_len(toy_dataframe: pd.DataFrame) -> None:
+    data = Data(toy_dataframe)
+
+    assert len(data) == len(toy_dataframe)
+
+
+def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
+    data = Data(toy_dataframe)
 
     pt.assert_index_equal(data.columns, pd.Index(["a", "b", "c"]))
     assert data.shape == (3, 3)
     assert data.to_csv() == ",a,b,c\n0,0,1,2\n1,3,4,5\n2,6,7,8\n"
-    assert data.iat[1, 2] == 5
-    assert data.at[2, "a"] == 6
+    expected = 5
+    assert data.iat[1, 2] == expected  # noqa: PD009
+    assert data.iloc[1, 2] == expected
+    expected = 6
+    assert data.at[2, "a"] == expected  # noqa: PD008
+    assert data.loc[2, "a"] == expected
 
 
-def test_data_attributes() -> None:
-    df = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]], columns=["a", "b", "c"])  # type: ignore
-    data = Data(df)
+def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
+    data = Data(toy_dataframe)
 
-    pt.assert_series_equal(data.a, df.a)  # type: ignore
-    pt.assert_series_equal(data.b, df.b)  # type: ignore
-    pt.assert_series_equal(data.c, df.c)  # type: ignore
+    pt.assert_series_equal(data.a, toy_dataframe.a)
+    pt.assert_series_equal(data.b, toy_dataframe.b)
+    pt.assert_series_equal(data.c, toy_dataframe.c)
 
 
-def test_data_min() -> None:
+@pytest.mark.parametrize(
+    ("col", "expected"),
+    [
+        ("a", 1),
+        ("d", 3.5),
+    ],
+)
+def test_data_min(col: str, expected: float) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.min("a") == 1
-    assert data.min("d") == 3.5
+    assert data.min(col) == expected
 
 
-def test_data_min_list() -> None:
+@pytest.mark.parametrize(
+    ("cols", "expected"),
+    [
+        (["a", "b", "c"], [1, 0.01, 10.0]),
+        (["b", "d", "c", "e"], [0.01, 3.5, 10.0, 100]),
+    ],
+)
+def test_data_min_list(cols: list[str], expected: list[float]) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.min(["a", "b", "c"]) == [1, 0.01, 10.0]
-    assert data.min(["b", "d", "c", "e"]) == [0.01, 3.5, 10.0, 100]
+    assert data.min(cols) == expected
 
 
-def test_data_max() -> None:
+@pytest.mark.parametrize(
+    ("col", "expected"),
+    [
+        ("b", 0.04),
+        ("c", 40.0),
+    ],
+)
+def test_data_max(col: str, expected: float) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.max("b") == 0.04
-    assert data.max("c") == 40.0
+    assert data.max(col) == expected
 
 
-def test_data_max_list() -> None:
+@pytest.mark.parametrize(
+    ("cols", "expected"),
+    [
+        (["a", "b", "c"], [4, 0.04, 40.0]),
+        (["b", "d", "c", "e"], [0.04, 11.5, 40.0, 400]),
+    ],
+)
+def test_data_max_list(cols: list[str], expected: list[float]) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.max(["a", "b", "c"]) == [4, 0.04, 40.0]
-    assert data.max(["b", "d", "c", "e"]) == [0.04, 11.5, 40.0, 400]
+    assert data.max(cols) == expected
 
 
-def test_data_param() -> None:
+@pytest.mark.parametrize(
+    ("col", "expected"),
+    [
+        ("b", 0.01),
+    ],
+)
+def test_data_param(col: str, expected: float) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.param("b") == 0.01
+    assert data.param(col) == expected
 
 
-def test_data_param_list() -> None:
+@pytest.mark.parametrize(
+    ("cols", "expected"),
+    [
+        (["c", "e"], [10.0, 100]),
+    ],
+)
+def test_data_param_list(cols: list[str], expected: list[float]) -> None:
     csv_path = csv_dir_path / "test.csv"
     data = Data(csv_path)
-    assert data.param(["c", "e"]) == [10.0, 100]
+    assert data.param(cols) == expected
 
 
-@pytest.mark.parametrize("cls", [str, Path])
-def test_tagged_data_init_path(cls) -> None:
+@pytest.mark.parametrize("obj", [str, Path])
+def test_tagged_data_init_path(obj: type) -> None:
     csv_path = csv_dir_path / "test_tagged_data.csv"
-    path = cls(csv_path)
+    path = obj(csv_path)
     raw_df = pd.read_csv(csv_path)
 
     tagged_data = TaggedData(path)
@@ -204,7 +248,7 @@ def test_tagged_data_init_path(cls) -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_tagged_data_init_StringIO() -> None:
+def test_tagged_data_init_StringIO() -> None:  # noqa: N802
     csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -232,7 +276,7 @@ def test_tagged_data_init_StringIO() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_tagged_data_init_DataFrame() -> None:
+def test_tagged_data_init_DataFrame() -> None:  # noqa: N802
     csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
@@ -342,7 +386,8 @@ def test_tagged_data_items() -> None:
     items = tagged_data.items()
 
     assert isinstance(items, list)
-    assert len(items) == 3
+    expected = 3
+    assert len(items) == expected
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
         for i, tup in enumerate(items):
@@ -390,31 +435,49 @@ def test_tagged_data_get_default() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_tagged_data_param() -> None:
+@pytest.mark.parametrize(
+    ("col", "tag", "expected"),
+    [
+        ("a", "tag01", 0),
+        ("b", "tag02", 11),
+        ("c", "tag03", 22),
+    ],
+)
+def test_tagged_data_param(col: str, tag: str, expected: float) -> None:
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
-    assert tagged_data.param("a", "tag01") == 0
-    assert tagged_data.param("b", "tag02") == 11
-    assert tagged_data.param("c", "tag03") == 22
+    assert tagged_data.param(col, tag) == expected
 
 
-def test_tagged_data_param_default() -> None:
+@pytest.mark.parametrize(
+    ("col", "expected"),
+    [
+        ("a", 0),
+        ("b", 1),
+        ("c", 2),
+    ],
+)
+def test_tagged_data_param_default(col: str, expected: float) -> None:
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
-    assert tagged_data.param("a") == 0
-    assert tagged_data.param("b") == 1
-    assert tagged_data.param("c") == 2
+    assert tagged_data.param(col) == expected
 
 
-def test_tagged_data_param_list() -> None:
+@pytest.mark.parametrize(
+    ("cols", "tag", "expected"),
+    [
+        (["a", "b", "c"], "tag01", [0, 1, 2]),
+        (["b", "c", "d"], "tag02", [11, 12, 13]),
+        (["c", "d", "e"], "tag03", [22, 23, 24]),
+    ],
+)
+def test_tagged_data_param_list(cols: list[str], tag: str, expected: list[float]) -> None:
     csv_path = csv_dir_path / "test_tagged_data.csv"
     tagged_data = TaggedData(csv_path)
 
-    assert tagged_data.param(["a", "b", "c"], "tag01") == [0, 1, 2]
-    assert tagged_data.param(["b", "c", "d"], "tag02") == [11, 12, 13]
-    assert tagged_data.param(["c", "d", "e"], "tag03") == [22, 23, 24]
+    assert tagged_data.param(cols, tag) == expected
 
 
 def test_tagged_data_param_list_split() -> None:
@@ -422,10 +485,10 @@ def test_tagged_data_param_list_split() -> None:
     tagged_data = TaggedData(csv_path)
 
     a, b, c = tagged_data.param(["a", "b", "c"], "tag01")
-
-    assert a == 0
-    assert b == 1
-    assert c == 2
+    expected_values = (0, 1, 2)
+    assert a == expected_values[0]
+    assert b == expected_values[1]
+    assert c == expected_values[2]
 
 
 def test_tagged_data_param_list_default() -> None:
