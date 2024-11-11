@@ -8,7 +8,7 @@ import pandas as pd
 import pandas._testing as pt
 import pytest
 
-from pyplotutil.datautil import Data, DataSet
+from pyplotutil.datautil import Data, TaggedData
 
 csv_dir_path = Path(__file__).parent / "data"
 
@@ -20,7 +20,7 @@ a,b,c,d,e
 4,0.04,40.0,11.5,400
 """
 
-test_dataset = """\
+test_tagged_data = """\
 tag,a,b,c,d,e
 tag01,0,1,2,3,4
 tag01,5,6,7,8,9
@@ -175,19 +175,19 @@ def test_data_param_list() -> None:
 
 
 @pytest.mark.parametrize("cls", [str, Path])
-def test_dataset_init_path(cls) -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
+def test_tagged_data_init_path(cls) -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
     path = cls(csv_path)
     raw_df = pd.read_csv(csv_path)
 
-    dataset = DataSet(path)
+    tagged_data = TaggedData(path)
 
-    assert dataset.datapath == Path(csv_path)
-    assert dataset.datadir == Path(csv_dir_path)
-    pt.assert_frame_equal(dataset.dataframe, raw_df)
+    assert tagged_data.datapath == Path(csv_path)
+    assert tagged_data.datadir == Path(csv_dir_path)
+    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        datadict = dataset.datadict
+        datadict = tagged_data.datadict
         pt.assert_frame_equal(
             datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
@@ -204,18 +204,18 @@ def test_dataset_init_path(cls) -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_init_StringIO() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
+def test_tagged_data_init_StringIO() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
-    dataset = DataSet(StringIO(test_dataset))
+    tagged_data = TaggedData(StringIO(test_tagged_data))
 
-    assert dataset.datapath is None
-    assert dataset.datadir is None
-    pt.assert_frame_equal(dataset.dataframe, raw_df)
+    assert tagged_data.datapath is None
+    assert tagged_data.datadir is None
+    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        datadict = dataset.datadict
+        datadict = tagged_data.datadict
         pt.assert_frame_equal(
             datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
@@ -232,81 +232,81 @@ def test_dataset_init_StringIO() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_init_DataFrame() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
+def test_tagged_data_init_DataFrame() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
     raw_df = pd.read_csv(csv_path)
 
     if isinstance(raw_df, pd.DataFrame):
-        dataset = DataSet(raw_df)
+        tagged_data = TaggedData(raw_df)
         groups = raw_df.groupby("tag")
 
-        assert dataset.datapath is None
-        assert dataset.datadir is None
-        pt.assert_frame_equal(dataset.dataframe, raw_df)
+        assert tagged_data.datapath is None
+        assert tagged_data.datadir is None
+        pt.assert_frame_equal(tagged_data.dataframe, raw_df)
         pt.assert_frame_equal(
-            dataset.datadict["tag01"].dataframe,
+            tagged_data.datadict["tag01"].dataframe,
             groups.get_group("tag01").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset.datadict["tag02"].dataframe,
+            tagged_data.datadict["tag02"].dataframe,
             groups.get_group("tag02").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset.datadict["tag03"].dataframe,
+            tagged_data.datadict["tag03"].dataframe,
             groups.get_group("tag03").reset_index(drop=True),
         )
     else:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_non_default_tag() -> None:
-    csv_path = csv_dir_path / "test_dataset_label.csv"
+def test_tagged_data_non_default_tag() -> None:
+    csv_path = csv_dir_path / "test_tagged_data_label.csv"
     raw_df = pd.read_csv(csv_path)
 
-    dataset = DataSet(csv_path, by="label")
+    tagged_data = TaggedData(csv_path, by="label")
 
-    assert dataset.datapath == Path(csv_path)
-    assert dataset.datadir == Path(csv_dir_path)
-    pt.assert_frame_equal(dataset.dataframe, raw_df)
+    assert tagged_data.datapath == Path(csv_path)
+    assert tagged_data.datadir == Path(csv_dir_path)
+    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("label")
         pt.assert_frame_equal(
-            dataset.datadict["label01"].dataframe,
+            tagged_data.datadict["label01"].dataframe,
             groups.get_group("label01").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset.datadict["label02"].dataframe,
+            tagged_data.datadict["label02"].dataframe,
             groups.get_group("label02").reset_index(drop=True),
         )
         pt.assert_frame_equal(
-            dataset.datadict["label03"].dataframe,
+            tagged_data.datadict["label03"].dataframe,
             groups.get_group("label03").reset_index(drop=True),
         )
     else:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_no_tag() -> None:
+def test_tagged_data_no_tag() -> None:
     csv_path = csv_dir_path / "test.csv"
     raw_df = pd.read_csv(csv_path)
 
-    dataset = DataSet(csv_path)
-    pt.assert_frame_equal(dataset.dataframe, raw_df)
+    tagged_data = TaggedData(csv_path)
+    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
     if isinstance(raw_df, pd.DataFrame):
-        assert len(dataset.datadict) == 1
-        pt.assert_frame_equal(dataset.datadict["0"].dataframe, raw_df)
+        assert len(tagged_data.datadict) == 1
+        pt.assert_frame_equal(tagged_data.datadict["0"].dataframe, raw_df)
     else:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_iter() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_iter() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
 
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        for i, data in enumerate(dataset):
+        for i, data in enumerate(tagged_data):
             pt.assert_frame_equal(
                 data.dataframe,
                 groups.get_group(f"tag{i+1:02d}").reset_index(drop=True),
@@ -315,31 +315,31 @@ def test_dataset_iter() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_property_datadict() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
-    assert isinstance(dataset.datadict, dict)
-    assert list(dataset.datadict.keys()) == ["tag01", "tag02", "tag03"]
+def test_tagged_data_property_datadict() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
+    assert isinstance(tagged_data.datadict, dict)
+    assert list(tagged_data.datadict.keys()) == ["tag01", "tag02", "tag03"]
 
 
-def test_dataset_keys() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
-    assert dataset.keys() == ["tag01", "tag02", "tag03"]
+def test_tagged_data_keys() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
+    assert tagged_data.keys() == ["tag01", "tag02", "tag03"]
 
 
-def test_dataset_tags() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
-    assert dataset.tags() == ["tag01", "tag02", "tag03"]
+def test_tagged_data_tags() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
+    assert tagged_data.tags() == ["tag01", "tag02", "tag03"]
 
 
-def test_dataset_items() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_items() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
 
-    items = dataset.items()
+    items = tagged_data.items()
 
     assert isinstance(items, list)
     assert len(items) == 3
@@ -357,15 +357,15 @@ def test_dataset_items() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_get() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_get() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
 
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
         for tag in ["tag01", "tag02", "tag03"]:
-            data = dataset.get(tag)
+            data = tagged_data.get(tag)
             pt.assert_frame_equal(
                 data.dataframe,
                 groups.get_group(tag).reset_index(drop=True),
@@ -374,14 +374,14 @@ def test_dataset_get() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_get_default() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_get_default() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
     raw_df = pd.read_csv(csv_path)
 
     if isinstance(raw_df, pd.DataFrame):
         groups = raw_df.groupby("tag")
-        data = dataset.get()
+        data = tagged_data.get()
         pt.assert_frame_equal(
             data.dataframe,
             groups.get_group("tag01").reset_index(drop=True),
@@ -390,51 +390,51 @@ def test_dataset_get_default() -> None:
         pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-def test_dataset_param() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_param() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
 
-    assert dataset.param("a", "tag01") == 0
-    assert dataset.param("b", "tag02") == 11
-    assert dataset.param("c", "tag03") == 22
-
-
-def test_dataset_param_default() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
-
-    assert dataset.param("a") == 0
-    assert dataset.param("b") == 1
-    assert dataset.param("c") == 2
+    assert tagged_data.param("a", "tag01") == 0
+    assert tagged_data.param("b", "tag02") == 11
+    assert tagged_data.param("c", "tag03") == 22
 
 
-def test_dataset_param_list() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_param_default() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
 
-    assert dataset.param(["a", "b", "c"], "tag01") == [0, 1, 2]
-    assert dataset.param(["b", "c", "d"], "tag02") == [11, 12, 13]
-    assert dataset.param(["c", "d", "e"], "tag03") == [22, 23, 24]
+    assert tagged_data.param("a") == 0
+    assert tagged_data.param("b") == 1
+    assert tagged_data.param("c") == 2
 
 
-def test_dataset_param_list_split() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_param_list() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
 
-    a, b, c = dataset.param(["a", "b", "c"], "tag01")
+    assert tagged_data.param(["a", "b", "c"], "tag01") == [0, 1, 2]
+    assert tagged_data.param(["b", "c", "d"], "tag02") == [11, 12, 13]
+    assert tagged_data.param(["c", "d", "e"], "tag03") == [22, 23, 24]
+
+
+def test_tagged_data_param_list_split() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
+
+    a, b, c = tagged_data.param(["a", "b", "c"], "tag01")
 
     assert a == 0
     assert b == 1
     assert c == 2
 
 
-def test_dataset_param_list_default() -> None:
-    csv_path = csv_dir_path / "test_dataset.csv"
-    dataset = DataSet(csv_path)
+def test_tagged_data_param_list_default() -> None:
+    csv_path = csv_dir_path / "test_tagged_data.csv"
+    tagged_data = TaggedData(csv_path)
 
-    assert dataset.param(["a", "b", "c", "d", "e"]) == [0, 1, 2, 3, 4]
+    assert tagged_data.param(["a", "b", "c", "d", "e"]) == [0, 1, 2, 3, 4]
 
 
 # Local Variables:
-# jinx-local-words: "cls csv dataset noqa"
+# jinx-local-words: "cls csv noqa"
 # End:

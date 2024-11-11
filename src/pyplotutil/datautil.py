@@ -134,7 +134,7 @@ class Data(BaseData):
             raise TypeError(msg)
 
 
-class DataSet(BaseData):
+class TaggedData(BaseData):
     _datadict: dict[str, Data]
     _groups: Any
     _by: str
