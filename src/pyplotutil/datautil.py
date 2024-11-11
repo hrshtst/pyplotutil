@@ -156,7 +156,7 @@ class Data(BaseData):
 
     """
 
-    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
+    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
         """Initialize the Data object with the provided data source.
 
         Parameters
@@ -216,7 +216,7 @@ class Data(BaseData):
         """
         return len(self.dataframe)
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str):  # noqa: ANN204
         """Access DataFrame attributes not explicitly defined in Data.
 
         Parameters
@@ -260,11 +260,11 @@ class Data(BaseData):
         """
         if isinstance(col, str):
             return self.dataframe[col].min()
-        elif isinstance(col, Sequence):
+        if isinstance(col, Sequence):
             return [self.dataframe[c].min() for c in col]
-        else:
-            msg = f"unsupported type: {type(col)}"
-            raise TypeError(msg)
+
+        msg = f"unsupported type: {type(col)}"
+        raise TypeError(msg)
 
     @overload
     def max(self, col: str) -> NumericType: ...
@@ -288,11 +288,11 @@ class Data(BaseData):
         """
         if isinstance(col, str):
             return self.dataframe[col].max()
-        elif isinstance(col, Sequence):
+        if isinstance(col, Sequence):
             return [self.dataframe[c].max() for c in col]
-        else:
-            msg = f"unsupported type: {type(col)}"
-            raise TypeError(msg)
+
+        msg = f"unsupported type: {type(col)}"
+        raise TypeError(msg)
 
     @overload
     def param(self, col: str) -> NumericType: ...
@@ -315,12 +315,12 @@ class Data(BaseData):
 
         """
         if isinstance(col, str):
-            return self.dataframe.at[0, col]
-        elif isinstance(col, Sequence):
-            return [self.dataframe.at[0, c] for c in col]
-        else:
-            msg = f"unsupported type: {type(col)}"
-            raise TypeError(msg)
+            return self.dataframe.loc[0, col]
+        if isinstance(col, Sequence):
+            return [self.dataframe.loc[0, c] for c in col]
+
+        msg = f"unsupported type: {type(col)}"
+        raise TypeError(msg)
 
 
 class TaggedData(BaseData):
@@ -330,7 +330,7 @@ class TaggedData(BaseData):
     _groups: Any
     _by: str
 
-    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
+    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
         """Initialize the TaggedData object and groups data by the specified tag.
 
         Parameters
@@ -470,12 +470,12 @@ class TaggedData(BaseData):
             tag = self.keys()[0]
 
         if isinstance(col, str):
-            return self.datadict[tag].dataframe.at[0, col]
-        elif isinstance(col, Sequence):
-            return [self.datadict[tag].dataframe.at[0, c] for c in col]
-        else:
-            msg = f"unsupported type: {type(col)}"
-            raise TypeError(msg)
+            return self.datadict[tag].dataframe.loc[0, col]
+        if isinstance(col, Sequence):
+            return [self.datadict[tag].dataframe.loc[0, c] for c in col]
+
+        msg = f"unsupported type: {type(col)}"
+        raise TypeError(msg)
 
 
 # Local Variables:
