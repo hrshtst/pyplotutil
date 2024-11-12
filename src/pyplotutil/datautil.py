@@ -35,10 +35,11 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
-from io import StringIO
+import os
+from collections.abc import Hashable, Iterator, Sequence
+from io import FileIO, StringIO, TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
 import pandas as pd
@@ -46,25 +47,159 @@ from pandas.api.types import is_string_dtype
 
 if TYPE_CHECKING:
     from pandas.io.parsers import TextFileReader
+    from pandas.io.parsers.readers import UsecolsArgType
 
+FilePath: TypeAlias = str | Path
+DataSourceType: TypeAlias = FilePath | StringIO | pd.DataFrame
 NumericType: TypeAlias = int | float | complex | np.number
 NumericTypeVar = TypeVar("NumericTypeVar", bound=NumericType)
 
 
 class BaseData:
-    """Base class for data handling.
+    """Base class for data handling and manipulation.
 
     This class has functionalities for setting and retrieving the path and the main DataFrame
     associated with the data.
 
     """
 
-    _datapath: Path | None
+    _datapath: Path
     _dataframe: pd.DataFrame
 
-    def __init__(self) -> None:
-        """Initialize the BaseData object without a data path."""
-        self._datapath = None
+    def __init__(
+        self,
+        data_source: DataSourceType,
+        *,
+        sep: str,
+        header: int | Sequence[int] | Literal["infer"] | None,
+        names: Sequence[Hashable] | None,
+        usecols: UsecolsArgType,
+        nrows: int | None,
+        comment: str | None,
+    ) -> None:
+        """Initialize the BaseData object with the provided data source.
+
+        Parameters
+        ----------
+        data : str, Path, StringIO, or pd.DataFrame
+            The data source.
+        **kwds : dict, optional
+            Additional keyword arguments passed to `pd.read_csv`.
+
+        Raises
+        ------
+        TypeError
+            If the data type is unsupported.
+
+        """
+        if isinstance(data_source, pd.DataFrame):
+            self._set_dataframe(data_source)
+        elif isinstance(data_source, StringIO | FilePath):
+            self._set_dataframe(
+                self.read_csv(
+                    data_source,
+                    sep=sep,
+                    header=header,
+                    names=names,
+                    usecols=usecols,
+                    nrows=nrows,
+                    comment=comment,
+                ),
+            )
+            if isinstance(data_source, FilePath):
+                self._set_datapath(data_source)
+        else:
+            msg = f"Unsupported data source type: {type(data_source)}"
+            raise TypeError(msg)
+
+    @staticmethod
+    def read_commented_column_names(file_or_buffer: FilePath | StringIO, *, sep: str, comment: str) -> list[str] | None:
+        """Return a list of column names.
+
+        File or string buffer are assumed to start lines with commented lines. The last commented
+        line is split with `sep`. The split strings are returned as a list of column names.
+
+        """
+
+        def last_commented_header(buffer: TextIOWrapper, comment: str) -> str:
+            header = ""
+            for line in buffer:
+                if line.startswith(comment):
+                    header = line
+                else:
+                    break
+            return header
+
+        if isinstance(file_or_buffer, FilePath):
+            with Path(file_or_buffer).open() as f:
+                header = last_commented_header(f, comment)
+        else:
+            header = last_commented_header(file_or_buffer, comment)
+            file_or_buffer.seek(0)
+        if len(header) > 0:
+            return header[1:].strip().split(sep)
+        return None
+
+    @staticmethod
+    def read_csv(
+        file_or_buffer: FilePath | StringIO,
+        *,
+        sep: str = ",",
+        header: int | Sequence[int] | Literal["infer"] | None,
+        names: Sequence[Hashable] | None,
+        usecols: UsecolsArgType,
+        nrows: int | None,
+        comment: str | None,
+    ) -> pd.DataFrame:
+        """Return a pandas DataFrame loaded from a file or string buffer."""
+        if comment is not None and names is None:
+            names = BaseData.read_commented_column_names(file_or_buffer, sep=sep, comment=comment)
+        return pd.read_csv(
+            file_or_buffer,
+            sep=sep,
+            header=header,
+            names=names,
+            usecols=usecols,
+            nrows=nrows,
+            comment=comment,
+            iterator=False,
+            chunksize=None,
+        )
+
+    def _set_dataframe(self, dataframe: pd.DataFrame) -> None:
+        """Set the DataFrame associated with the data object.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            The DataFrame to associate with the data.
+
+        Raises
+        ------
+        TypeError
+            If the provided df is not a DataFrame.
+
+        """
+        self._dataframe = dataframe
+
+    @property
+    def dataframe(self) -> pd.DataFrame:
+        """Retrieve the raw DataFrame associated with the data.
+
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame associated with the data.
+
+        """
+        return self._dataframe
+
+    def is_loaded_from_file(self) -> bool:
+        try:
+            _ = self._datapath
+        except AttributeError:
+            return False
+        return True
 
     def _set_datapath(self, datapath: str | Path) -> None:
         """Set the path to the data file.
@@ -77,7 +212,8 @@ class BaseData:
         """
         self._datapath = Path(datapath)
 
-    def _get_datapath(self) -> Path | None:
+    @property
+    def datapath(self) -> Path:
         """Retrieve the path to the data file.
 
         Returns
@@ -88,9 +224,8 @@ class BaseData:
         """
         return self._datapath
 
-    datapath = property(_get_datapath, _set_datapath)
-
-    def _get_datadir(self) -> Path | None:
+    @property
+    def datadir(self) -> Path | None:
         """Retrieve the directory of the data file.
 
         Returns
@@ -102,41 +237,6 @@ class BaseData:
         if isinstance(self._datapath, Path):
             return self._datapath.parent
         return None
-
-    datadir = property(_get_datadir)
-
-    def _set_dataframe(self, df: pd.DataFrame | TextFileReader) -> None:
-        """Set the DataFrame associated with the data.
-
-        Parameters
-        ----------
-        df : pd.DataFrame or TextFileReader
-            The DataFrame to associate with the data.
-
-        Raises
-        ------
-        TypeError
-            If the provided df is not a DataFrame.
-
-        """
-        if isinstance(df, pd.DataFrame):
-            self._dataframe = df
-        else:
-            msg = f"unsupported type: {type(df)}"
-            raise TypeError(msg)
-
-    def _get_dataframe(self) -> pd.DataFrame:
-        """Retrieve the raw DataFrame associated with the data.
-
-        Returns
-        -------
-        pd.DataFrame
-            The DataFrame associated with the data.
-
-        """
-        return self._dataframe
-
-    dataframe = property(_get_dataframe, _set_dataframe)
 
     def __str__(self) -> str:
         """Return a string representation of the DataFrame.
@@ -157,7 +257,17 @@ class Data(BaseData):
 
     """
 
-    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
+    def __init__(
+        self,
+        data_source: DataSourceType,
+        *,
+        sep: str = ",",
+        header: int | Sequence[int] | Literal["infer"] | None = "infer",
+        names: Sequence[Hashable] | None = None,
+        usecols: UsecolsArgType = None,
+        nrows: int | None = None,
+        comment: str | None = None,
+    ) -> None:
         """Initialize the Data object with the provided data source.
 
         Parameters
@@ -173,38 +283,33 @@ class Data(BaseData):
             If the data type is unsupported.
 
         """
-        super().__init__()
+        super().__init__(
+            data_source,
+            sep=sep,
+            header=header,
+            names=names,
+            usecols=usecols,
+            nrows=nrows,
+            comment=comment,
+        )
 
-        if isinstance(data, str | Path):
-            self._set_datapath(data)
+        # self._set_attributes()
 
-        if self.datapath is not None:
-            self._set_dataframe(pd.read_csv(self.datapath, **kwds))
-        elif isinstance(data, StringIO):
-            self._set_dataframe(pd.read_csv(data, **kwds))
-        elif isinstance(data, pd.DataFrame):
-            self._set_dataframe(data)
-        else:
-            msg = f"unsupported type: {type(data)}"
-            raise TypeError(msg)
+    # def __getitem__(self, key: str | int) -> pd.Series:
+    #     """Access a specific column or row by key.
 
-        self._set_attributes()
+    #     Parameters
+    #     ----------
+    #     key : str or int
+    #         Column name or row index.
 
-    def __getitem__(self, key: str | int) -> pd.Series:
-        """Access a specific column or row by key.
+    #     Returns
+    #     -------
+    #     pd.Series
+    #         The column or row data as a Series.
 
-        Parameters
-        ----------
-        key : str or int
-            Column name or row index.
-
-        Returns
-        -------
-        pd.Series
-            The column or row data as a Series.
-
-        """
-        return self.dataframe[key]
+    #     """
+    #     return self.dataframe[key]
 
     def __len__(self) -> int:
         """Return the number of rows in the DataFrame.
@@ -331,152 +436,152 @@ class TaggedData(BaseData):
     _groups: Any
     _by: str
 
-    def __init__(self, data: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
-        """Initialize the TaggedData object and groups data by the specified tag.
+    # def __init__(self, data_source: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
+    #     """Initialize the TaggedData object and groups data by the specified tag.
 
-        Parameters
-        ----------
-        data : str, Path, StringIO, or pd.DataFrame
-            The data source.
-        **kwds : dict, optional
-            Additional keyword arguments passed to `pd.read_csv`.
+    #     Parameters
+    #     ----------
+    #     data : str, Path, StringIO, or pd.DataFrame
+    #         The data source.
+    #     **kwds : dict, optional
+    #         Additional keyword arguments passed to `pd.read_csv`.
 
-        """
-        super().__init__()
-        self._datadict = {}
-        self._by = kwds.pop("by", "tag")
+    #     """
+    #     super().__init__(data_source)
+    #     self._datadict = {}
+    #     self._by = kwds.pop("by", "tag")
 
-        if isinstance(data, str | Path):
-            self._set_datapath(data)
+    #     if isinstance(data, str | Path):
+    #         self._set_datapath(data)
 
-        if self.datapath is not None:
-            self._set_dataframe(pd.read_csv(self.datapath, **kwds))
-        elif isinstance(data, StringIO):
-            self._set_dataframe(pd.read_csv(data, **kwds))
-        elif isinstance(data, pd.DataFrame):
-            self._set_dataframe(data)
-        else:
-            msg = f"unsupported type: {type(data)}"
-            raise TypeError(msg)
+    #     if self.datapath is not None:
+    #         self._set_dataframe(pd.read_csv(self.datapath, **kwds))
+    #     elif isinstance(data, StringIO):
+    #         self._set_dataframe(pd.read_csv(data, **kwds))
+    #     elif isinstance(data, pd.DataFrame):
+    #         self._set_dataframe(data)
+    #     else:
+    #         msg = f"unsupported type: {type(data)}"
+    #         raise TypeError(msg)
 
-        self._make_groups()
+    #     self._make_groups()
 
-    def __iter__(self) -> Iterator[Data]:
-        """Return an iterator over the grouped Data objects.
+    # def __iter__(self) -> Iterator[Data]:
+    #     """Return an iterator over the grouped Data objects.
 
-        Returns
-        -------
-        Iterator[Data]
-            An iterator over the grouped Data objects.
+    #     Returns
+    #     -------
+    #     Iterator[Data]
+    #         An iterator over the grouped Data objects.
 
-        """
-        return iter(self._datadict.values())
+    #     """
+    #     return iter(self._datadict.values())
 
-    def _make_groups(self) -> None:
-        """Group the data by the specified tag and stores it in `datadict`."""
-        if self._by in self.dataframe.columns:
-            self._groups = self.dataframe.groupby(self._by)
-            self._datadict = {
-                str(k): Data(self._groups.get_group(k).reset_index(drop=True)) for k in self._groups.groups
-            }
-        else:
-            self._datadict = {"0": Data(self.dataframe)}
+    # def _make_groups(self) -> None:
+    #     """Group the data by the specified tag and stores it in `datadict`."""
+    #     if self._by in self.dataframe.columns:
+    #         self._groups = self.dataframe.groupby(self._by)
+    #         self._datadict = {
+    #             str(k): Data(self._groups.get_group(k).reset_index(drop=True)) for k in self._groups.groups
+    #         }
+    #     else:
+    #         self._datadict = {"0": Data(self.dataframe)}
 
-    @property
-    def datadict(self) -> dict[str, Data]:
-        """Retrieve the dictionary of grouped Data objects.
+    # @property
+    # def datadict(self) -> dict[str, Data]:
+    #     """Retrieve the dictionary of grouped Data objects.
 
-        Returns
-        -------
-        dict of str, Data
-            Dictionary of grouped Data objects.
+    #     Returns
+    #     -------
+    #     dict of str, Data
+    #         Dictionary of grouped Data objects.
 
-        """
-        return self._datadict
+    #     """
+    #     return self._datadict
 
-    def keys(self) -> list[str]:
-        """Return the tags associated with the data groups.
+    # def keys(self) -> list[str]:
+    #     """Return the tags associated with the data groups.
 
-        Returns
-        -------
-        list of str
-            List of tags.
+    #     Returns
+    #     -------
+    #     list of str
+    #         List of tags.
 
-        """
-        return list(self.datadict.keys())
+    #     """
+    #     return list(self.datadict.keys())
 
-    def tags(self) -> list[str]:
-        """Return the tags associated with the data groups.
+    # def tags(self) -> list[str]:
+    #     """Return the tags associated with the data groups.
 
-        Returns
-        -------
-        list of str
-            List of tags.
+    #     Returns
+    #     -------
+    #     list of str
+    #         List of tags.
 
-        """
-        return self.keys()
+    #     """
+    #     return self.keys()
 
-    def items(self) -> list[tuple[str, Data]]:
-        """Retrieve the items (tag and Data object) of the grouped data.
+    # def items(self) -> list[tuple[str, Data]]:
+    #     """Retrieve the items (tag and Data object) of the grouped data.
 
-        Returns
-        -------
-        list of tuple of (str, Data)
-            List of tag-Data object pairs.
+    #     Returns
+    #     -------
+    #     list of tuple of (str, Data)
+    #         List of tag-Data object pairs.
 
-        """
-        return list(self.datadict.items())
+    #     """
+    #     return list(self.datadict.items())
 
-    def get(self, tag: str | None = None) -> Data:
-        """Retrieve the Data object associated with the specified tag.
+    # def get(self, tag: str | None = None) -> Data:
+    #     """Retrieve the Data object associated with the specified tag.
 
-        Parameters
-        ----------
-        tag : str or None, optional
-            Tag of the data group to retrieve.
+    #     Parameters
+    #     ----------
+    #     tag : str or None, optional
+    #         Tag of the data group to retrieve.
 
-        Returns
-        -------
-        Data
-            Data object corresponding to the tag.
+    #     Returns
+    #     -------
+    #     Data
+    #         Data object corresponding to the tag.
 
-        """
-        if tag is None:
-            tag = self.keys()[0]
-        return self.datadict[tag]
+    #     """
+    #     if tag is None:
+    #         tag = self.keys()[0]
+    #     return self.datadict[tag]
 
-    @overload
-    def param(self, col: str, tag: str | None = None) -> NumericType: ...
+    # @overload
+    # def param(self, col: str, tag: str | None = None) -> NumericType: ...
 
-    @overload
-    def param(self, col: list[str] | tuple[str], tag: str | None = None) -> list[NumericType]: ...
+    # @overload
+    # def param(self, col: list[str] | tuple[str], tag: str | None = None) -> list[NumericType]: ...
 
-    def param(self, col, tag=None):
-        """Retrieve the first value(s) of the specified column(s) from a tagged Data object.
+    # def param(self, col, tag=None):
+    #     """Retrieve the first value(s) of the specified column(s) from a tagged Data object.
 
-        Parameters
-        ----------
-        col : str, list of str, or tuple of str
-            Column name or list of column names.
-        tag : str or None, optional
-            Tag of the data group to retrieve.
+    #     Parameters
+    #     ----------
+    #     col : str, list of str, or tuple of str
+    #         Column name or list of column names.
+    #     tag : str or None, optional
+    #         Tag of the data group to retrieve.
 
-        Returns
-        -------
-        NumericType or list of NumericType
-            First value(s) in the column(s).
+    #     Returns
+    #     -------
+    #     NumericType or list of NumericType
+    #         First value(s) in the column(s).
 
-        """
-        if tag is None:
-            tag = self.keys()[0]
+    #     """
+    #     if tag is None:
+    #         tag = self.keys()[0]
 
-        if isinstance(col, str):
-            return self.datadict[tag].dataframe.loc[0, col]
-        if isinstance(col, Sequence):
-            return [self.datadict[tag].dataframe.loc[0, c] for c in col]
+    #     if isinstance(col, str):
+    #         return self.datadict[tag].dataframe.loc[0, col]
+    #     if isinstance(col, Sequence):
+    #         return [self.datadict[tag].dataframe.loc[0, c] for c in col]
 
-        msg = f"unsupported type: {type(col)}"
-        raise TypeError(msg)
+    #     msg = f"unsupported type: {type(col)}"
+    #     raise TypeError(msg)
 
 
 # Local Variables:

@@ -12,17 +12,34 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+from typing import Hashable, Literal, Sequence
 
 import pandas as pd
 import pandas.testing as pt
 import pytest
 
-from pyplotutil.datautil import Data, TaggedData
+from pyplotutil.datautil import Data, DataSourceType, TaggedData
 
 DATA_DIR_PATH = Path(__file__).parent / "data"
+TEST_CSV_FILE_PATH = DATA_DIR_PATH / "test.csv"
 
-TEST_DATA_TEXT = """\
+TEST_TEXT = """\
 a,b,c,d,e
+1,0.01,10.0,3.5,100
+2,0.02,20.0,7.5,200
+3,0.03,30.0,9.5,300
+4,0.04,40.0,11.5,400
+"""
+
+TEST_NO_HEADER_TEXT = """\
+1,0.01,10.0,3.5,100
+2,0.02,20.0,7.5,200
+3,0.03,30.0,9.5,300
+4,0.04,40.0,11.5,400
+"""
+
+TEST_COMMENT_HEADER_TEXT = """\
+# a,b,c,d,e
 1,0.01,10.0,3.5,100
 2,0.02,20.0,7.5,200
 3,0.03,30.0,9.5,300
@@ -52,45 +69,93 @@ tag03,225,226,227,228,229
 """
 
 
-@pytest.mark.parametrize("obj", [str, Path])
-def test_data_init_path(obj: type) -> None:
-    """Test the initialization of a `Data` object from a file path."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    path = obj(csv_path)
-    expected_df = pd.read_csv(csv_path)
-
-    data = Data(path)
-
-    assert data.datapath == Path(csv_path)
-    assert data.datadir == Path(DATA_DIR_PATH)
-    pt.assert_frame_equal(data.dataframe, expected_df)
+@pytest.fixture(scope="session")
+def expected_dataframe() -> pd.DataFrame:
+    """Return a pandas DataFrame object loaded from test.csv."""
+    return pd.read_csv(TEST_CSV_FILE_PATH)
 
 
-def test_data_init_StringIO() -> None:  # noqa: N802
-    """Test the initialization of a `Data` object from a `StringIO` object."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    expected_df = pd.read_csv(csv_path)
-
-    data = Data(StringIO(TEST_DATA_TEXT))
-
-    assert data.datapath is None
-    assert data.datadir is None
-    pt.assert_frame_equal(data.dataframe, expected_df)
-
-
-def test_data_init_DataFrame() -> None:  # noqa: N802
+def test_data_init_with_dataframe(expected_dataframe: pd.DataFrame) -> None:
     """Test the initialization of a `Data` object from a pandas DataFrame."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    expected_df = pd.read_csv(csv_path)
+    data = Data(expected_dataframe)
+    assert data.dataframe is expected_dataframe
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
 
-    if isinstance(expected_df, pd.DataFrame):
-        data = Data(expected_df)
 
-        assert data.datapath is None
-        assert data.datadir is None
-        pt.assert_frame_equal(data.dataframe, expected_df)
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(expected_df)}")
+def test_data_init_with_string_buffer(expected_dataframe: pd.DataFrame) -> None:
+    """Test the initialization of a `Data` object from a `StringIO` object."""
+    data = Data(StringIO(TEST_TEXT))
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+def test_data_init_with_path_str(expected_dataframe: pd.DataFrame) -> None:
+    """Test the initialization of a `Data` object from a file path string."""
+    data = Data(str(TEST_CSV_FILE_PATH))
+    assert data.datapath == TEST_CSV_FILE_PATH
+    assert data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+def test_data_init_with_path_object(expected_dataframe: pd.DataFrame) -> None:
+    """Test the initialization of a `Data` object from a file path object."""
+    data = Data(Path(TEST_CSV_FILE_PATH))
+    assert data.datapath == TEST_CSV_FILE_PATH
+    assert data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+@pytest.mark.parametrize(
+    ("filepath", "sep"),
+    [
+        (DATA_DIR_PATH / "test.csv", ","),
+        (DATA_DIR_PATH / "test_spaces.txt", " "),
+    ],
+)
+def test_data_init_with_sep(expected_dataframe: pd.DataFrame, filepath: Path, sep: str) -> None:
+    """Test the initialization of a `Data` object from a file with `sep` parameter."""
+    data = Data(filepath, sep=sep)
+    assert data.datapath == filepath
+    assert data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+@pytest.mark.parametrize(
+    ("data_source", "header", "names"),
+    [
+        (TEST_CSV_FILE_PATH, "infer", None),
+        (TEST_CSV_FILE_PATH, 0, None),
+        (DATA_DIR_PATH / "test_no_header.csv", None, ["a", "b", "c", "d", "e"]),
+        (StringIO(TEST_TEXT), "infer", None),
+        (StringIO(TEST_TEXT), 0, None),
+        (StringIO(TEST_NO_HEADER_TEXT), None, ["a", "b", "c", "d", "e"]),
+    ],
+)
+def test_data_init_with_header_and_names(
+    expected_dataframe: pd.DataFrame,
+    data_source: DataSourceType,
+    header: Literal["infer"] | int | None,
+    names: Sequence[Hashable] | None,
+) -> None:
+    """Test the initialization of a `Data` object from a file with `header` and `names` parameters."""
+    data = Data(data_source, header=header, names=names)
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+@pytest.mark.parametrize(
+    ("data_source", "comment"),
+    [
+        (DATA_DIR_PATH / "test_comment_header.csv", "#"),
+        (StringIO(TEST_COMMENT_HEADER_TEXT), "#"),
+    ],
+)
+def test_data_read_commented_header(
+    expected_dataframe: pd.DataFrame,
+    data_source: DataSourceType,
+    comment: str,
+) -> None:
+    """Test the initialization of a `Data` object from a file with commented header."""
+    data = Data(data_source, comment=comment)
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
 
 
 def test_data_init_kwds() -> None:
@@ -541,5 +606,5 @@ def test_tagged_data_param_list_default() -> None:
 
 
 # Local Variables:
-# jinx-local-words: "StringIO cls csv datadict len noqa"
+# jinx-local-words: "StringIO cls csv datadict filepath len noqa sep txt"
 # End:
