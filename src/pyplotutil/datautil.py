@@ -38,7 +38,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
 
 import numpy as np
 import pandas as pd
@@ -47,7 +47,8 @@ from pandas.api.types import is_string_dtype
 if TYPE_CHECKING:
     from pandas.io.parsers import TextFileReader
 
-NumericType = int | float | complex | np.number
+NumericType: TypeAlias = int | float | complex | np.number
+NumericTypeVar = TypeVar("NumericTypeVar", bound=NumericType)
 
 
 class BaseData:
