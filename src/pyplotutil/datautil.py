@@ -51,6 +51,7 @@ FilePath: TypeAlias = str | Path
 DataSourceType: TypeAlias = FilePath | StringIO | pd.DataFrame
 NumericType: TypeAlias = int | float | complex | np.number
 NumericTypeVar = TypeVar("NumericTypeVar", bound=NumericType)
+Unknown: TypeAlias = Any
 
 
 class BaseData:
@@ -296,21 +297,21 @@ class Data(BaseData):
 
         # self._set_attributes()
 
-    # def __getitem__(self, key: str | int) -> pd.Series:
-    #     """Access a specific column or row by key.
+    def __getitem__(self, key: Unknown) -> pd.Series | pd.DataFrame:
+        """Access a specific column or row by key.
 
-    #     Parameters
-    #     ----------
-    #     key : str or int
-    #         Column name or row index.
+        Parameters
+        ----------
+        key : str or int
+            Column name or row index.
 
-    #     Returns
-    #     -------
-    #     pd.Series
-    #         The column or row data as a Series.
+        Returns
+        -------
+        pd.Series
+            The column or row data as a Series.
 
-    #     """
-    #     return self.dataframe[key]
+        """
+        return self.dataframe.__getitem__(key)
 
     def __len__(self) -> int:
         """Return the number of rows in the DataFrame.

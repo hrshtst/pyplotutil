@@ -246,7 +246,6 @@ def toy_dataframe() -> pd.DataFrame:
     return pd.DataFrame(raw_data, columns=columns)
 
 
-@pytest.mark.skip
 def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
     """Test column access via indexing on `Data` objects."""
     data = Data(toy_dataframe)
@@ -256,7 +255,6 @@ def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
     pt.assert_series_equal(data["c"], toy_dataframe.c)
 
 
-@pytest.mark.skip
 def test_data_getitem_no_header() -> None:
     """Test column access in DataFrames without a header."""
     toy_dataframe_no_header = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
