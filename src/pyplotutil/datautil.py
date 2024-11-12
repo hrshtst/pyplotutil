@@ -1,18 +1,18 @@
 """Data Handling and Manipulation Module.
 
 This module provides classes for managing and manipulating tabular data, with functionalities to
-load data from various sources, group data by specified tags, and access columns or rows with
-intuitive syntax. The primary classes, `Data`, and `TaggedData`, facilitate working with data in
-pandas DataFrames while allowing access to specific features like data grouping, dynamic attribute
-setting, and easy retrieval of minimum, maximum, and parameter values.
+load data from various sources, grouped data structure by specified tags, and access columns or rows
+with intuitive syntax. The primary classes, `Data`, and `TaggedData`, facilitate working with
+tabular data in pandas DataFrame while allowing access to specific features like data grouping,
+dynamic attribute setting, and easy retrieval of minimum, maximum, and parameter values.
 
 Classes
 -------
 BaseData : Abstract base class providing the core attributes and methods for data handling.
     Defines basic properties for data path and DataFrame storage.
 
-Data : Extends BaseData to represent a single data object.
-    Provides methods to access columns and calculate minimum, maximum, and specific values.
+Data : Extends BaseData to represent a single tabular data.
+    Provides methods to access columns and calculate minimum, maximum, and specific parameters.
 
 TaggedData : Extends BaseData to handle grouped data based on a specified tag column.
     Allows grouping data by a tag and accessing each group as a separate `Data` object.
@@ -24,8 +24,8 @@ Basic usage:
     >>> print(data.min("column_name"))
 
 Tagged data usage:
-    >>> tagged_data = TaggedData("data.csv", by="category")
-    >>> group = tagged_data.get("some_category")
+    >>> tagged_data = TaggedData("data.csv", by="tag")
+    >>> group = tagged_data.get("specific_tag")
     >>> print(group.max("column_name"))
 
 This module is designed to streamline operations with tabular data in data analysis, data plotting,
