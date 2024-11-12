@@ -35,9 +35,8 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
-import os
-from collections.abc import Hashable, Iterator, Sequence
-from io import FileIO, StringIO, TextIOWrapper
+from collections.abc import Hashable, Sequence
+from io import StringIO, TextIOWrapper
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar, overload
 
@@ -46,7 +45,6 @@ import pandas as pd
 from pandas.api.types import is_string_dtype
 
 if TYPE_CHECKING:
-    from pandas.io.parsers import TextFileReader
     from pandas.io.parsers.readers import UsecolsArgType
 
 FilePath: TypeAlias = str | Path
@@ -135,7 +133,6 @@ class BaseData:
                 header = last_commented_header(f, comment)
         else:
             header = last_commented_header(file_or_buffer, comment)
-            file_or_buffer.seek(0)
         if len(header) > 0:
             return header[1:].strip().split(sep)
         return None
@@ -154,6 +151,8 @@ class BaseData:
         """Return a pandas DataFrame loaded from a file or string buffer."""
         if comment is not None and names is None:
             names = BaseData.read_commented_column_names(file_or_buffer, sep=sep, comment=comment)
+        if isinstance(file_or_buffer, StringIO):
+            file_or_buffer.seek(0)
         return pd.read_csv(
             file_or_buffer,
             sep=sep,
@@ -222,10 +221,14 @@ class BaseData:
             Path to the data file, if set; otherwise, None.
 
         """
-        return self._datapath
+        try:
+            return self._datapath
+        except AttributeError as e:
+            msg = "Data object may not be loaded from a file."
+            raise AttributeError(msg) from e
 
     @property
-    def datadir(self) -> Path | None:
+    def datadir(self) -> Path:
         """Retrieve the directory of the data file.
 
         Returns
@@ -234,9 +237,7 @@ class BaseData:
             Directory of the data file, if the path is set; otherwise, None.
 
         """
-        if isinstance(self._datapath, Path):
-            return self._datapath.parent
-        return None
+        return self.datapath.parent
 
     def __str__(self) -> str:
         """Return a string representation of the DataFrame.
@@ -322,21 +323,21 @@ class Data(BaseData):
         """
         return len(self.dataframe)
 
-    def __getattr__(self, name: str):  # noqa: ANN204
-        """Access DataFrame attributes not explicitly defined in Data.
+    # def __getattr__(self, name: str):
+    #     """Access DataFrame attributes not explicitly defined in Data.
 
-        Parameters
-        ----------
-        name : str
-            Attribute name.
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         Attribute name.
 
-        Returns
-        -------
-        Any
-            The attribute from the DataFrame.
+    #     Returns
+    #     -------
+    #     Any
+    #         The attribute from the DataFrame.
 
-        """
-        return getattr(self.dataframe, name)
+    #     """
+    #     return getattr(self.dataframe, name)
 
     def _set_attributes(self) -> None:
         """Set column names as attributes for quick access if column names are strings."""
@@ -436,7 +437,7 @@ class TaggedData(BaseData):
     _groups: Any
     _by: str
 
-    # def __init__(self, data_source: str | Path | StringIO | pd.DataFrame, **kwds) -> None:  # noqa: ANN003
+    # def __init__(self, data_source: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
     #     """Initialize the TaggedData object and groups data by the specified tag.
 
     #     Parameters
@@ -585,5 +586,5 @@ class TaggedData(BaseData):
 
 
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datapath df kwds noqa str"
+# jinx-local-words: "StringIO csv datadict dataframe datapath df kwds noqa sep str"
 # End:

@@ -12,13 +12,18 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
-from typing import Hashable, Literal, Sequence
+from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 import pandas.testing as pt
 import pytest
 
 from pyplotutil.datautil import Data, DataSourceType, TaggedData
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable, Sequence
+
+    from pandas.io.parsers.readers import UsecolsArgType
 
 DATA_DIR_PATH = Path(__file__).parent / "data"
 TEST_CSV_FILE_PATH = DATA_DIR_PATH / "test.csv"
@@ -141,6 +146,41 @@ def test_data_init_with_header_and_names(
     pt.assert_frame_equal(data.dataframe, expected_dataframe)
 
 
+@pytest.mark.parametrize("data_source", [TEST_CSV_FILE_PATH, StringIO(TEST_TEXT)])
+@pytest.mark.parametrize(
+    "usecols",
+    [
+        [0, 1, 2],
+        range(3),
+        [1, 2, 0],
+        ["a", "b", "c"],
+    ],
+)
+def test_data_init_with_usecols(
+    expected_dataframe: pd.DataFrame,
+    data_source: DataSourceType,
+    usecols: UsecolsArgType,
+) -> None:
+    """Test the initialization of a `Data` object from a file with `usecols` parameter."""
+    data = Data(data_source, usecols=usecols)
+    expected = expected_dataframe.iloc[:, [0, 1, 2]]
+    pt.assert_frame_equal(data.dataframe, expected)
+
+
+@pytest.mark.parametrize("data_source", [TEST_CSV_FILE_PATH, StringIO(TEST_TEXT)])
+@pytest.mark.parametrize("nrows", [2, 3])
+def test_data_init_with_nrows(
+    expected_dataframe: pd.DataFrame,
+    data_source: DataSourceType,
+    nrows: int,
+) -> None:
+    """Test the initialization of a `Data` object from a file with `nrows` parameter."""
+    data = Data(data_source, nrows=nrows)
+    expected = expected_dataframe[:nrows]
+    assert len(data) == nrows
+    pt.assert_frame_equal(data.dataframe, expected)
+
+
 @pytest.mark.parametrize(
     ("data_source", "comment"),
     [
@@ -158,14 +198,44 @@ def test_data_read_commented_header(
     pt.assert_frame_equal(data.dataframe, expected_dataframe)
 
 
-def test_data_init_kwds() -> None:
-    """Test initialization with keyword arguments to customize DataFrame loading."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    cols = pd.Series([0, 1])
-    expected_df = pd.read_csv(csv_path, usecols=cols)
-    data = Data(csv_path, usecols=cols)
-    assert len(data.dataframe.columns) == len(cols)
-    pt.assert_frame_equal(data.dataframe, expected_df)
+def test_data_read_partially_commented_data(expected_dataframe: pd.DataFrame) -> None:
+    """Test the initialization of a `Data` object from a file with commented header."""
+    data_source = DATA_DIR_PATH / "test_comment_partial_data.csv"
+    data = Data(data_source, comment="#")
+    expected = expected_dataframe.iloc[[0, 3]].reset_index(drop=True)
+    pt.assert_frame_equal(data.dataframe, expected)
+
+
+@pytest.mark.parametrize(
+    ("data_source", "expected"),
+    [
+        (TEST_CSV_FILE_PATH, True),
+        (StringIO(TEST_TEXT), False),
+        (pd.read_csv(TEST_CSV_FILE_PATH), False),
+    ],
+)
+def test_is_loaded_from_file(data_source: DataSourceType, *, expected: bool) -> None:
+    """Test if a `Data` object is loaded from a file."""
+    data = Data(data_source)
+    assert data.is_loaded_from_file() is expected
+
+
+@pytest.mark.parametrize("data_source", [StringIO(TEST_TEXT), pd.read_csv(TEST_CSV_FILE_PATH)])
+def test_datapath_error(data_source: DataSourceType) -> None:
+    """Test if an exception is raised when access to data path after initialized without a file."""
+    data = Data(data_source)
+    msg = "Data object may not be loaded from a file."
+    with pytest.raises(AttributeError, match=msg):
+        _ = data.datapath
+
+
+@pytest.mark.parametrize("data_source", [StringIO(TEST_TEXT), pd.read_csv(TEST_CSV_FILE_PATH)])
+def test_datadir_error(data_source: DataSourceType) -> None:
+    """Test if an exception is raised when access to data path after initialized without a file."""
+    data = Data(data_source)
+    msg = "Data object may not be loaded from a file."
+    with pytest.raises(AttributeError, match=msg):
+        _ = data.datadir
 
 
 @pytest.fixture
@@ -606,5 +676,5 @@ def test_tagged_data_param_list_default() -> None:
 
 
 # Local Variables:
-# jinx-local-words: "StringIO cls csv datadict filepath len noqa sep txt"
+# jinx-local-words: "StringIO cls csv datadict filepath len noqa nrows sep txt usecols"
 # End:
