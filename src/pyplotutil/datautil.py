@@ -35,16 +35,16 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Sequence
 from io import StringIO, TextIOWrapper
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_string_dtype
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable, Sequence
+
     from pandas.io.parsers.readers import UsecolsArgType
 
 FilePath: TypeAlias = str | Path
@@ -307,8 +307,6 @@ class Data(BaseData):
             comment=comment,
         )
 
-        # self._set_attributes()
-
     def __getitem__(self, key: Unknown) -> pd.Series | pd.DataFrame:
         """Access a specific column or row by key.
 
@@ -354,75 +352,13 @@ class Data(BaseData):
             return self.__getattribute__(name)
         return getattr(self.dataframe, name)
 
-    def _set_attributes(self) -> None:
-        """Set column names as attributes for quick access if column names are strings."""
-        if is_string_dtype(self.dataframe.columns):
-            for c in self.dataframe.columns:
-                setattr(self, str(c), getattr(self.dataframe, str(c)))
+    @overload
+    def param(self, key: int | str) -> NumericType: ...
 
     @overload
-    def min(self, col: str) -> NumericType: ...
+    def param(self, key: Sequence) -> pd.Series: ...
 
-    @overload
-    def min(self, col: list[str]) -> list[NumericType]: ...
-
-    def min(self, col):
-        """Compute the minimum value of the specified column(s).
-
-        Parameters
-        ----------
-        col : str or list of str
-            Column name or list of column names.
-
-        Returns
-        -------
-        NumericType or list of NumericType
-            Minimum value(s).
-
-        """
-        if isinstance(col, str):
-            return self.dataframe[col].min()
-        if isinstance(col, Sequence):
-            return [self.dataframe[c].min() for c in col]
-
-        msg = f"unsupported type: {type(col)}"
-        raise TypeError(msg)
-
-    @overload
-    def max(self, col: str) -> NumericType: ...
-
-    @overload
-    def max(self, col: list[str]) -> list[NumericType]: ...
-
-    def max(self, col):
-        """Compute the maximum value of the specified column(s).
-
-        Parameters
-        ----------
-        col : str or list of str
-            Column name or list of column names.
-
-        Returns
-        -------
-        NumericType or list of NumericType
-            Maximum value(s).
-
-        """
-        if isinstance(col, str):
-            return self.dataframe[col].max()
-        if isinstance(col, Sequence):
-            return [self.dataframe[c].max() for c in col]
-
-        msg = f"unsupported type: {type(col)}"
-        raise TypeError(msg)
-
-    @overload
-    def param(self, col: str) -> NumericType: ...
-
-    @overload
-    def param(self, col: list[str] | tuple[str]) -> list[NumericType]: ...
-
-    def param(self, col):
+    def param(self, key):
         """Retrieve the first value(s) of the specified column(s).
 
         Parameters
@@ -436,13 +372,7 @@ class Data(BaseData):
             First value(s) in the column(s).
 
         """
-        if isinstance(col, str):
-            return self.dataframe.loc[0, col]
-        if isinstance(col, Sequence):
-            return [self.dataframe.loc[0, c] for c in col]
-
-        msg = f"unsupported type: {type(col)}"
-        raise TypeError(msg)
+        return self.dataframe.loc[0, key]
 
 
 class TaggedData(BaseData):
@@ -601,5 +531,5 @@ class TaggedData(BaseData):
 
 
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict dataframe datapath df kwds noqa sep str"
+# jinx-local-words: "StringIO csv datadict datadir dataframe datapath df noqa sep str"
 # End:

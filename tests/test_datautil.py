@@ -80,6 +80,12 @@ def expected_dataframe() -> pd.DataFrame:
     return pd.read_csv(TEST_CSV_FILE_PATH)
 
 
+@pytest.fixture(scope="session")
+def default_data() -> Data:
+    """Return a default `Data` object."""
+    return Data(TEST_CSV_FILE_PATH)
+
+
 def test_data_init_with_dataframe(expected_dataframe: pd.DataFrame) -> None:
     """Test the initialization of a `Data` object from a pandas DataFrame."""
     data = Data(expected_dataframe)
@@ -290,7 +296,7 @@ def test_data_len(toy_dataframe: pd.DataFrame) -> None:
 
 
 def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
-    """Test attribute-style access to DataFrame attributes."""
+    """Test attribute-style access to various DataFrame attributes."""
     data = Data(toy_dataframe)
 
     pt.assert_index_equal(data.columns, pd.Index(["a", "b", "c"]))
@@ -304,7 +310,6 @@ def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
     assert data.loc[2, "a"] == expected
 
 
-@pytest.mark.skip
 def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
     """Test direct attribute access for columns."""
     data = Data(toy_dataframe)
@@ -314,7 +319,6 @@ def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
     pt.assert_series_equal(data.c, toy_dataframe.c)
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("col", "expected"),
     [
@@ -322,14 +326,11 @@ def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
         ("d", 3.5),
     ],
 )
-def test_data_min(col: str, expected: float) -> None:
+def test_data_min(default_data: Data, col: str, expected: float) -> None:
     """Test minimum value retrieval from specified columns."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.min(col) == expected
+    assert default_data[col].min() == expected
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("cols", "expected"),
     [
@@ -337,14 +338,11 @@ def test_data_min(col: str, expected: float) -> None:
         (["b", "d", "c", "e"], [0.01, 3.5, 10.0, 100]),
     ],
 )
-def test_data_min_list(cols: list[str], expected: list[float]) -> None:
+def test_data_min_list(default_data: Data, cols: list[str], expected: list[float]) -> None:
     """Test minimum value retrieval from multiple columns."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.min(cols) == expected
+    pt.assert_series_equal(default_data[cols].min(), pd.Series(expected, index=cols))
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("col", "expected"),
     [
@@ -352,14 +350,11 @@ def test_data_min_list(cols: list[str], expected: list[float]) -> None:
         ("c", 40.0),
     ],
 )
-def test_data_max(col: str, expected: float) -> None:
+def test_data_max(default_data: Data, col: str, expected: float) -> None:
     """Test maximum value retrieval from specified columns."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.max(col) == expected
+    assert default_data[col].max() == expected
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("cols", "expected"),
     [
@@ -367,39 +362,31 @@ def test_data_max(col: str, expected: float) -> None:
         (["b", "d", "c", "e"], [0.04, 11.5, 40.0, 400]),
     ],
 )
-def test_data_max_list(cols: list[str], expected: list[float]) -> None:
+def test_data_max_list(default_data: Data, cols: list[str], expected: list[float]) -> None:
     """Test maximum value retrieval from multiple columns."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.max(cols) == expected
+    pt.assert_series_equal(default_data[cols].max(), pd.Series(expected, index=cols))
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("col", "expected"),
     [
         ("b", 0.01),
     ],
 )
-def test_data_param(col: str, expected: float) -> None:
+def test_data_param(default_data: Data, col: str, expected: float) -> None:
     """Test parameter retrieval for a specified column."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.param(col) == expected
+    assert default_data.param(col) == expected
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     ("cols", "expected"),
     [
         (["c", "e"], [10.0, 100]),
     ],
 )
-def test_data_param_list(cols: list[str], expected: list[float]) -> None:
+def test_data_param_list(default_data: Data, cols: list[str], expected: list[float]) -> None:
     """Test parameter retrieval from multiple columns."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    data = Data(csv_path)
-    assert data.param(cols) == expected
+    pt.assert_series_equal(default_data.param(cols), pd.Series(expected, index=cols), check_names=False)
 
 
 @pytest.mark.skip
