@@ -21,12 +21,12 @@ Examples
 --------
 Basic usage:
     >>> data = Data("data.csv")
-    >>> print(data.min("column_name"))
+    >>> print(data.param("column_name"))
 
 Tagged data usage:
-    >>> tagged_data = TaggedData("data.csv", by="tag")
-    >>> group = tagged_data.get("specific_tag")
-    >>> print(group.max("column_name"))
+    >>> tagged_data = TaggedData("data.csv", tag="tag")
+    >>> data = tagged_data.get("specific_tag")
+    >>> print(group.param("column_name"))
 
 This module is designed to streamline operations with tabular data in data analysis, data plotting,
 and other applications requiring structured data handling.
@@ -545,5 +545,5 @@ class TaggedData(BaseData):
 
 
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datadir dataframe datapath df noqa sep str"
+# jinx-local-words: "StringIO csv datadict datadir dataframe datapath df noqa param sep str"
 # End:
