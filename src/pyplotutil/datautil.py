@@ -194,6 +194,18 @@ class BaseData:
         """
         return self._dataframe
 
+    @property
+    def df(self) -> pd.DataFrame:
+        """Alias for `dataframe` attribute.
+
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame associated with the data.
+
+        """
+        return self.dataframe
+
     def is_loaded_from_file(self) -> bool:
         try:
             _ = self._datapath
