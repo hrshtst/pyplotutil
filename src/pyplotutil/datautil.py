@@ -324,21 +324,23 @@ class Data(BaseData):
         """
         return len(self.dataframe)
 
-    # def __getattr__(self, name: str):
-    #     """Access DataFrame attributes not explicitly defined in Data.
+    def __getattr__(self, name: str) -> Unknown:
+        """Access DataFrame attributes not explicitly defined in Data.
 
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Attribute name.
+        Parameters
+        ----------
+        name : str
+            Attribute name.
 
-    #     Returns
-    #     -------
-    #     Any
-    #         The attribute from the DataFrame.
+        Returns
+        -------
+        Any
+            The attribute from the DataFrame.
 
-    #     """
-    #     return getattr(self.dataframe, name)
+        """
+        if name in ("datapath", "datadir"):
+            return self.__getattribute__(name)
+        return getattr(self.dataframe, name)
 
     def _set_attributes(self) -> None:
         """Set column names as attributes for quick access if column names are strings."""

@@ -282,7 +282,6 @@ def test_data_getitem_no_header_multiple() -> None:
     pt.assert_frame_equal(data[[0, 1]], toy_dataframe_no_header[[0, 1]])
 
 
-@pytest.mark.skip
 def test_data_len(toy_dataframe: pd.DataFrame) -> None:
     """Test length access via the `__len__` method."""
     data = Data(toy_dataframe)
@@ -290,7 +289,6 @@ def test_data_len(toy_dataframe: pd.DataFrame) -> None:
     assert len(data) == len(toy_dataframe)
 
 
-@pytest.mark.skip
 def test_data_getattr(toy_dataframe: pd.DataFrame) -> None:
     """Test attribute-style access to DataFrame attributes."""
     data = Data(toy_dataframe)
