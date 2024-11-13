@@ -255,6 +255,14 @@ def test_data_getitem(toy_dataframe: pd.DataFrame) -> None:
     pt.assert_series_equal(data["c"], toy_dataframe.c)
 
 
+def test_data_getitem_multiple(toy_dataframe: pd.DataFrame) -> None:
+    """Test multiple column access via indexing on `Data` objects."""
+    data = Data(toy_dataframe)
+
+    pt.assert_frame_equal(data[["a", "b"]], toy_dataframe.loc[:, ["a", "b"]])
+    pt.assert_frame_equal(data[["a", "b"]], toy_dataframe[["a", "b"]])
+
+
 def test_data_getitem_no_header() -> None:
     """Test column access in DataFrames without a header."""
     toy_dataframe_no_header = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
@@ -263,6 +271,15 @@ def test_data_getitem_no_header() -> None:
     pt.assert_series_equal(data[0], toy_dataframe_no_header[0])
     pt.assert_series_equal(data[1], toy_dataframe_no_header[1])
     pt.assert_series_equal(data[2], toy_dataframe_no_header[2])
+
+
+def test_data_getitem_no_header_multiple() -> None:
+    """Test multiple column access in DataFrames without a header."""
+    toy_dataframe_no_header = pd.DataFrame([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+    data = Data(toy_dataframe_no_header)
+
+    pt.assert_frame_equal(data[[0, 1]], toy_dataframe_no_header.loc[:, [0, 1]])
+    pt.assert_frame_equal(data[[0, 1]], toy_dataframe_no_header[[0, 1]])
 
 
 @pytest.mark.skip
