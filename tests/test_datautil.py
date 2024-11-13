@@ -1,5 +1,5 @@
 # ruff: noqa: S101
-"""Unit Tests for the Data Handling and Manipulation Module.
+"""Unit tests for the datautil module.
 
 This test suite verifies the functionality of the `Data` and `TaggedData` classes, which facilitate
 the management and manipulation of tabular data in pandas DataFrames. The tests cover class
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 DATA_DIR_PATH = Path(__file__).parent / "data"
 TEST_CSV_FILE_PATH = DATA_DIR_PATH / "test.csv"
+TEST_TAGGED_DATA_CSV_FILE_PATH = DATA_DIR_PATH / "test_tagged_data.csv"
 
 TEST_TEXT = """\
 a,b,c,d,e
@@ -86,10 +87,41 @@ def default_data() -> Data:
     return Data(TEST_CSV_FILE_PATH)
 
 
+@pytest.fixture(scope="session")
+def tagged_dataframe() -> pd.DataFrame:
+    """Return a pandas DataFrame object loaded from test_tagged_data.csv."""
+    return pd.read_csv(TEST_TAGGED_DATA_CSV_FILE_PATH)
+
+
+@pytest.fixture(scope="session")
+def default_tagged_data() -> TaggedData:
+    """Return a default `Data` object."""
+    return TaggedData(TEST_TAGGED_DATA_CSV_FILE_PATH)
+
+
 def test_data_init_with_dataframe(expected_dataframe: pd.DataFrame) -> None:
     """Test the initialization of a `Data` object from a pandas DataFrame."""
     data = Data(expected_dataframe)
     assert data.dataframe is expected_dataframe
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+def test_data_init_with_series() -> None:
+    """Test the initialization of a `Data` object from a pandas DataFrame."""
+    values = [1, 2, 3, 4]
+    name = "a"
+    series = pd.Series(values, name=name)
+    expected_dataframe = pd.DataFrame(values, columns=pd.Series([name]))
+    data = Data(series)
+    pt.assert_frame_equal(data.dataframe, expected_dataframe)
+
+
+def test_data_init_with_series_no_name() -> None:
+    """Test the initialization of a `Data` object from a pandas DataFrame."""
+    values = [1, 2, 3, 4]
+    series = pd.Series(values)
+    expected_dataframe = pd.DataFrame(values)
+    data = Data(series)
     pt.assert_frame_equal(data.dataframe, expected_dataframe)
 
 
@@ -389,320 +421,243 @@ def test_data_param_list(default_data: Data, cols: list[str], expected: list[flo
     pt.assert_series_equal(default_data.param(cols), pd.Series(expected, index=cols), check_names=False)
 
 
-@pytest.mark.skip
-@pytest.mark.parametrize("obj", [str, Path])
-def test_tagged_data_init_path(obj: type) -> None:
-    """Test initialization of `TaggedData` from a file path."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    path = obj(csv_path)
-    raw_df = pd.read_csv(csv_path)
+def test_tagged_data_init_with_dataframe(tagged_dataframe: pd.DataFrame) -> None:
+    """Test initialization of `TaggedData` from a pandas DataFrame."""
+    tagged_data = TaggedData(tagged_dataframe)
+    groups = tagged_dataframe.groupby("tag")
 
-    tagged_data = TaggedData(path)
-
-    assert tagged_data.datapath == Path(csv_path)
-    assert tagged_data.datadir == Path(DATA_DIR_PATH)
-    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        datadict = tagged_data.datadict
-        pt.assert_frame_equal(
-            datadict["tag01"].dataframe,
-            groups.get_group("tag01").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            datadict["tag02"].dataframe,
-            groups.get_group("tag02").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            datadict["tag03"].dataframe,
-            groups.get_group("tag03").reset_index(drop=True),
-        )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    pt.assert_frame_equal(
+        tagged_data.datadict["tag01"].dataframe,
+        groups.get_group("tag01").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        tagged_data.datadict["tag02"].dataframe,
+        groups.get_group("tag02").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        tagged_data.datadict["tag03"].dataframe,
+        groups.get_group("tag03").reset_index(drop=True),
+    )
 
 
-@pytest.mark.skip
-def test_tagged_data_init_StringIO() -> None:  # noqa: N802
+def test_tagged_data_init_with_string_buffer(tagged_dataframe: pd.DataFrame) -> None:
     """Test initialization of `TaggedData` from a `StringIO` object."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    raw_df = pd.read_csv(csv_path)
-
     tagged_data = TaggedData(StringIO(TEST_TAGGED_DATA_TEXT))
 
-    assert tagged_data.datapath is None
-    assert tagged_data.datadir is None
-    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        datadict = tagged_data.datadict
-        pt.assert_frame_equal(
-            datadict["tag01"].dataframe,
-            groups.get_group("tag01").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            datadict["tag02"].dataframe,
-            groups.get_group("tag02").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            datadict["tag03"].dataframe,
-            groups.get_group("tag03").reset_index(drop=True),
-        )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    groups = tagged_dataframe.groupby("tag")
+    datadict = tagged_data.datadict
+    pt.assert_frame_equal(
+        datadict["tag01"].dataframe,
+        groups.get_group("tag01").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag02"].dataframe,
+        groups.get_group("tag02").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag03"].dataframe,
+        groups.get_group("tag03").reset_index(drop=True),
+    )
 
 
-@pytest.mark.skip
-def test_tagged_data_init_DataFrame() -> None:  # noqa: N802
-    """Test initialization of `TaggedData` from a DataFrame."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    raw_df = pd.read_csv(csv_path)
+def test_tagged_data_init_with_path_str(tagged_dataframe: pd.DataFrame) -> None:
+    """Test initialization of `TaggedData` from a file path."""
+    tagged_data = TaggedData(str(TEST_TAGGED_DATA_CSV_FILE_PATH))
 
-    if isinstance(raw_df, pd.DataFrame):
-        tagged_data = TaggedData(raw_df)
-        groups = raw_df.groupby("tag")
-
-        assert tagged_data.datapath is None
-        assert tagged_data.datadir is None
-        pt.assert_frame_equal(tagged_data.dataframe, raw_df)
-        pt.assert_frame_equal(
-            tagged_data.datadict["tag01"].dataframe,
-            groups.get_group("tag01").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            tagged_data.datadict["tag02"].dataframe,
-            groups.get_group("tag02").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            tagged_data.datadict["tag03"].dataframe,
-            groups.get_group("tag03").reset_index(drop=True),
-        )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
+    assert tagged_data.datapath == TEST_TAGGED_DATA_CSV_FILE_PATH
+    assert tagged_data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    groups = tagged_dataframe.groupby("tag")
+    datadict = tagged_data.datadict
+    pt.assert_frame_equal(
+        datadict["tag01"].dataframe,
+        groups.get_group("tag01").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag02"].dataframe,
+        groups.get_group("tag02").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag03"].dataframe,
+        groups.get_group("tag03").reset_index(drop=True),
+    )
 
 
-@pytest.mark.skip
-def test_tagged_data_non_default_tag() -> None:
+def test_tagged_data_init_with_path_object(tagged_dataframe: pd.DataFrame) -> None:
+    """Test initialization of `TaggedData` from a file path."""
+    tagged_data = TaggedData(Path(TEST_TAGGED_DATA_CSV_FILE_PATH))
+
+    assert tagged_data.datapath == TEST_TAGGED_DATA_CSV_FILE_PATH
+    assert tagged_data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    groups = tagged_dataframe.groupby("tag")
+    datadict = tagged_data.datadict
+    pt.assert_frame_equal(
+        datadict["tag01"].dataframe,
+        groups.get_group("tag01").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag02"].dataframe,
+        groups.get_group("tag02").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        datadict["tag03"].dataframe,
+        groups.get_group("tag03").reset_index(drop=True),
+    )
+
+
+def test_tagged_data_init_with_custom_tag() -> None:
     """Test tagged data grouping with a custom tag column."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data_label.csv"
-    raw_df = pd.read_csv(csv_path)
+    path = DATA_DIR_PATH / "test_tagged_data_label.csv"
+    tagged_dataframe = pd.read_csv(path)
 
-    tagged_data = TaggedData(csv_path, by="label")
+    tagged_data = TaggedData(path, tag="label")
 
-    assert tagged_data.datapath == Path(csv_path)
-    assert tagged_data.datadir == Path(DATA_DIR_PATH)
-    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("label")
-        pt.assert_frame_equal(
-            tagged_data.datadict["label01"].dataframe,
-            groups.get_group("label01").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            tagged_data.datadict["label02"].dataframe,
-            groups.get_group("label02").reset_index(drop=True),
-        )
-        pt.assert_frame_equal(
-            tagged_data.datadict["label03"].dataframe,
-            groups.get_group("label03").reset_index(drop=True),
-        )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
+    assert tagged_data.datapath == path
+    assert tagged_data.datadir == DATA_DIR_PATH
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    groups = tagged_dataframe.groupby("label")
+    pt.assert_frame_equal(
+        tagged_data.datadict["label01"].dataframe,
+        groups.get_group("label01").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        tagged_data.datadict["label02"].dataframe,
+        groups.get_group("label02").reset_index(drop=True),
+    )
+    pt.assert_frame_equal(
+        tagged_data.datadict["label03"].dataframe,
+        groups.get_group("label03").reset_index(drop=True),
+    )
 
 
-@pytest.mark.skip
 def test_tagged_data_no_tag() -> None:
     """Test `TaggedData` initialization without a tag column."""
-    csv_path = DATA_DIR_PATH / "test.csv"
-    raw_df = pd.read_csv(csv_path)
+    tagged_dataframe = pd.read_csv(TEST_CSV_FILE_PATH)
 
-    tagged_data = TaggedData(csv_path)
-    pt.assert_frame_equal(tagged_data.dataframe, raw_df)
-    if isinstance(raw_df, pd.DataFrame):
-        assert len(tagged_data.datadict) == 1
-        pt.assert_frame_equal(tagged_data.datadict["0"].dataframe, raw_df)
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
+    tagged_data = TaggedData(TEST_CSV_FILE_PATH)
+    pt.assert_frame_equal(tagged_data.dataframe, tagged_dataframe)
+    assert len(tagged_data.datadict) == 1
+    pt.assert_frame_equal(tagged_data.datadict["unknown"].dataframe, tagged_dataframe)
 
 
-@pytest.mark.skip
-def test_tagged_data_iter() -> None:
+def test_tagged_data_iterator(default_tagged_data: TaggedData, tagged_dataframe: pd.DataFrame) -> None:
     """Test iteration over `TaggedData` groups."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    raw_df = pd.read_csv(csv_path)
-
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        for i, data in enumerate(tagged_data):
-            pt.assert_frame_equal(
-                data.dataframe,
-                groups.get_group(f"tag{i+1:02d}").reset_index(drop=True),
-            )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
-
-
-@pytest.mark.skip
-def test_tagged_data_property_datadict() -> None:
-    """Test access to the `datadict` property in `TaggedData`."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    assert isinstance(tagged_data.datadict, dict)
-    assert list(tagged_data.datadict.keys()) == ["tag01", "tag02", "tag03"]
-
-
-@pytest.mark.skip
-def test_tagged_data_keys() -> None:
-    """Test retrieval of group keys in `TaggedData`."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    assert tagged_data.keys() == ["tag01", "tag02", "tag03"]
-
-
-@pytest.mark.skip
-def test_tagged_data_tags() -> None:
-    """Test retrieval of unique tags in `TaggedData`."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    assert tagged_data.tags() == ["tag01", "tag02", "tag03"]
-
-
-@pytest.mark.skip
-def test_tagged_data_items() -> None:
-    """Test the `items` method to retrieve data groups and associated tags."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    raw_df = pd.read_csv(csv_path)
-
-    items = tagged_data.items()
-
-    assert isinstance(items, list)
-    expected = 3
-    assert len(items) == expected
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        for i, tup in enumerate(items):
-            tag = tup[0]
-            data = tup[1]
-            assert tag == f"tag{i+1:02d}"
-            pt.assert_frame_equal(
-                data.dataframe,
-                groups.get_group(tag).reset_index(drop=True),
-            )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
-
-
-@pytest.mark.skip
-def test_tagged_data_get() -> None:
-    """Test retrieval of a data group by tag."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    raw_df = pd.read_csv(csv_path)
-
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        for tag in ["tag01", "tag02", "tag03"]:
-            data = tagged_data.get(tag)
-            pt.assert_frame_equal(
-                data.dataframe,
-                groups.get_group(tag).reset_index(drop=True),
-            )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
-
-
-@pytest.mark.skip
-def test_tagged_data_get_default() -> None:
-    """Test retrieval of the default data group."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-    raw_df = pd.read_csv(csv_path)
-
-    if isinstance(raw_df, pd.DataFrame):
-        groups = raw_df.groupby("tag")
-        data = tagged_data.get()
+    groups = tagged_dataframe.groupby("tag")
+    for i, data in enumerate(default_tagged_data):
         pt.assert_frame_equal(
             data.dataframe,
-            groups.get_group("tag01").reset_index(drop=True),
+            groups.get_group(f"tag{i+1:02d}").reset_index(drop=True),
         )
-    else:
-        pytest.skip(f"Expected DataFrame type: {type(raw_df)}")
 
 
-@pytest.mark.skip
+def test_tagged_data_datadict(default_tagged_data: TaggedData) -> None:
+    """Test access to the `datadict` property in `TaggedData`."""
+    assert isinstance(default_tagged_data.datadict, dict)
+    assert list(default_tagged_data.datadict.keys()) == ["tag01", "tag02", "tag03"]
+
+
+def test_tagged_data_tags(default_tagged_data: TaggedData) -> None:
+    """Test retrieval of unique tags in `TaggedData`."""
+    assert list(default_tagged_data.tags()) == ["tag01", "tag02", "tag03"]
+
+
+def test_tagged_data_items(default_tagged_data: TaggedData, tagged_dataframe: pd.DataFrame) -> None:
+    """Test the `items` method to retrieve data groups and associated tags."""
+    groups = tagged_dataframe.groupby("tag")
+    assert len(default_tagged_data.items()) == len(groups)
+    for i, (tag, data) in enumerate(default_tagged_data.items()):
+        assert tag == f"tag{i+1:02d}"
+        pt.assert_frame_equal(
+            data.dataframe,
+            groups.get_group(tag).reset_index(drop=True),
+        )
+
+
+def test_tagged_data_get(default_tagged_data: TaggedData, tagged_dataframe: pd.DataFrame) -> None:
+    """Test retrieval of a data group by tag."""
+    groups = tagged_dataframe.groupby("tag")
+    for tag in ["tag01", "tag02", "tag03"]:
+        data = default_tagged_data.get(tag)
+        pt.assert_frame_equal(
+            data.dataframe,
+            groups.get_group(tag).reset_index(drop=True),
+        )
+
+
+def test_tagged_data_get_default_data(
+    default_tagged_data: TaggedData,
+    tagged_dataframe: pd.DataFrame,
+    default_data: Data,
+) -> None:
+    """Test retrieval of a data group by tag with default data object."""
+    groups = tagged_dataframe.groupby("tag")
+    for tag in ["tag01", "tag02", "tag03"]:
+        data = default_tagged_data.get(tag, default=default_data)
+        pt.assert_frame_equal(
+            data.dataframe,
+            groups.get_group(tag).reset_index(drop=True),
+        )
+    data_non_exist_tag = default_tagged_data.get("non_exist_tag", default=default_data)
+    pt.assert_frame_equal(data_non_exist_tag.dataframe, default_data.dataframe)
+
+
+def test_tagged_data_get_default_none(default_tagged_data: TaggedData, tagged_dataframe: pd.DataFrame) -> None:
+    """Test retrieval of a data group by tag with None object."""
+    groups = tagged_dataframe.groupby("tag")
+    for tag in ["tag01", "tag02", "tag03"]:
+        data = default_tagged_data.get(tag, default=None)
+        if data is not None:
+            pt.assert_frame_equal(
+                data.dataframe,
+                groups.get_group(tag).reset_index(drop=True),
+            )
+    data_non_exist_tag = default_tagged_data.get("non_exist_tag", default=None)
+    assert data_non_exist_tag is None
+
+
 @pytest.mark.parametrize(
-    ("col", "tag", "expected"),
+    ("tag", "col", "expected"),
     [
-        ("a", "tag01", 0),
-        ("b", "tag02", 11),
-        ("c", "tag03", 22),
+        ("tag01", "a", 0),
+        ("tag02", "b", 11),
+        ("tag03", "c", 22),
     ],
 )
-def test_tagged_data_param(col: str, tag: str, expected: float) -> None:
+def test_tagged_data_param(default_tagged_data: TaggedData, tag: str, col: str, expected: float) -> None:
     """Test parameter retrieval from a tagged group."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-
-    assert tagged_data.param(col, tag) == expected
+    assert default_tagged_data.param(tag, col) == expected
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
-    ("col", "expected"),
+    ("tag", "cols", "expected"),
     [
-        ("a", 0),
-        ("b", 1),
-        ("c", 2),
+        ("tag01", ["a", "b", "c"], [0, 1, 2]),
+        ("tag02", ["b", "c", "d"], [11, 12, 13]),
+        ("tag03", ["c", "d", "e"], [22, 23, 24]),
     ],
 )
-def test_tagged_data_param_default(col: str, expected: float) -> None:
-    """Test parameter retrieval with the default tag."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-
-    assert tagged_data.param(col) == expected
-
-
-@pytest.mark.skip
-@pytest.mark.parametrize(
-    ("cols", "tag", "expected"),
-    [
-        (["a", "b", "c"], "tag01", [0, 1, 2]),
-        (["b", "c", "d"], "tag02", [11, 12, 13]),
-        (["c", "d", "e"], "tag03", [22, 23, 24]),
-    ],
-)
-def test_tagged_data_param_list(cols: list[str], tag: str, expected: list[float]) -> None:
+def test_tagged_data_param_list(
+    default_tagged_data: TaggedData,
+    tag: str,
+    cols: list[str],
+    expected: list[float],
+) -> None:
     """Test parameter retrieval for multiple columns from a tagged group."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-
-    assert tagged_data.param(cols, tag) == expected
+    pt.assert_series_equal(default_tagged_data.param(tag, cols), pd.Series(expected, index=cols), check_names=False)
 
 
-@pytest.mark.skip
-def test_tagged_data_param_list_split() -> None:
+def test_tagged_data_param_list_unpack(default_tagged_data: TaggedData) -> None:
     """Test unpacking multiple column parameters from a tagged group."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-
-    a, b, c = tagged_data.param(["a", "b", "c"], "tag01")
+    a, b, c = default_tagged_data.param("tag01", ["a", "b", "c"])
     expected_values = (0, 1, 2)
     assert a == expected_values[0]
     assert b == expected_values[1]
     assert c == expected_values[2]
 
 
-@pytest.mark.skip
-def test_tagged_data_param_list_default() -> None:
-    """Test parameter retrieval from multiple columns with the default tag."""
-    csv_path = DATA_DIR_PATH / "test_tagged_data.csv"
-    tagged_data = TaggedData(csv_path)
-
-    assert tagged_data.param(["a", "b", "c", "d", "e"]) == [0, 1, 2, 3, 4]
-
-
 # Local Variables:
-# jinx-local-words: "StringIO cls csv datadict filepath len noqa nrows sep txt usecols"
+# jinx-local-words: "StringIO cls csv datadict datautil filepath len noqa nrows sep txt usecols"
 # End:

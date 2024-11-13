@@ -35,23 +35,32 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
+from enum import Enum, auto
 from io import StringIO, TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Sequence
+    from collections.abc import Hashable, ItemsView, Iterator, KeysView, Sequence
 
     from pandas.io.parsers.readers import UsecolsArgType
 
 FilePath: TypeAlias = str | Path
-DataSourceType: TypeAlias = FilePath | StringIO | pd.DataFrame
+DataSourceType: TypeAlias = FilePath | StringIO | pd.DataFrame | pd.Series
 NumericType: TypeAlias = int | float | complex | np.number
 NumericTypeVar = TypeVar("NumericTypeVar", bound=NumericType)
 Unknown: TypeAlias = Any
+
+
+class _NoDefault(Enum):
+    no_default = auto()
+
+
+no_default: Final = _NoDefault.no_default
+NoDefault: TypeAlias = Literal[_NoDefault.no_default]
 
 
 class BaseData:
@@ -93,6 +102,8 @@ class BaseData:
         """
         if isinstance(data_source, pd.DataFrame):
             self._set_dataframe(data_source)
+        elif isinstance(data_source, pd.Series):
+            self._set_dataframe(data_source.to_frame())
         elif isinstance(data_source, StringIO | FilePath):
             self._set_dataframe(
                 self.read_csv(
@@ -207,6 +218,7 @@ class BaseData:
         return self.dataframe
 
     def is_loaded_from_file(self) -> bool:
+        """Check if `Data` object is loaded from a file."""
         try:
             _ = self._datapath
         except AttributeError:
@@ -372,162 +384,164 @@ class Data(BaseData):
             First value(s) in the column(s).
 
         """
-        return self.dataframe.loc[0, key]
+        row = self.dataframe.loc[0, key]
+        if isinstance(row, pd.Series | pd.DataFrame):
+            row = pd.to_numeric(row)
+        return row
 
 
 class TaggedData(BaseData):
     """Class for managing data tagged by a specific column for easy access by group."""
 
     _datadict: dict[str, Data]
-    _groups: Any
-    _by: str
 
-    # def __init__(self, data_source: str | Path | StringIO | pd.DataFrame, **kwds) -> None:
-    #     """Initialize the TaggedData object and groups data by the specified tag.
+    def __init__(
+        self,
+        data_source: DataSourceType,
+        *,
+        sep: str = ",",
+        header: int | Sequence[int] | Literal["infer"] | None = "infer",
+        names: Sequence[Hashable] | None = None,
+        usecols: UsecolsArgType = None,
+        nrows: int | None = None,
+        comment: str | None = None,
+        tag: Unknown = "tag",
+    ) -> None:
+        """Initialize the Data object with the provided data source.
 
-    #     Parameters
-    #     ----------
-    #     data : str, Path, StringIO, or pd.DataFrame
-    #         The data source.
-    #     **kwds : dict, optional
-    #         Additional keyword arguments passed to `pd.read_csv`.
+        Parameters
+        ----------
+        data : str, Path, StringIO, or pd.DataFrame
+            The data source.
+        **kwds : dict, optional
+            Additional keyword arguments passed to `pd.read_csv`.
 
-    #     """
-    #     super().__init__(data_source)
-    #     self._datadict = {}
-    #     self._by = kwds.pop("by", "tag")
+        Raises
+        ------
+        TypeError
+            If the data type is unsupported.
 
-    #     if isinstance(data, str | Path):
-    #         self._set_datapath(data)
+        """
+        super().__init__(
+            data_source,
+            sep=sep,
+            header=header,
+            names=names,
+            usecols=usecols,
+            nrows=nrows,
+            comment=comment,
+        )
+        self._make_groups(tag)
 
-    #     if self.datapath is not None:
-    #         self._set_dataframe(pd.read_csv(self.datapath, **kwds))
-    #     elif isinstance(data, StringIO):
-    #         self._set_dataframe(pd.read_csv(data, **kwds))
-    #     elif isinstance(data, pd.DataFrame):
-    #         self._set_dataframe(data)
-    #     else:
-    #         msg = f"unsupported type: {type(data)}"
-    #         raise TypeError(msg)
+    def __iter__(self) -> Iterator[Data]:
+        """Return an iterator over the grouped Data objects.
 
-    #     self._make_groups()
+        Returns
+        -------
+        Iterator[Data]
+            An iterator over the grouped Data objects.
 
-    # def __iter__(self) -> Iterator[Data]:
-    #     """Return an iterator over the grouped Data objects.
+        """
+        return iter(self.datadict.values())
 
-    #     Returns
-    #     -------
-    #     Iterator[Data]
-    #         An iterator over the grouped Data objects.
+    def _make_groups(self, by: Unknown) -> None:
+        """Group the data by the specified tag and stores it in `datadict`."""
+        self._datadict = {}
+        try:
+            groups = self.dataframe.groupby(by)
+        except KeyError:
+            self._datadict = {"unknown": Data(self.dataframe)}
+        else:
+            self._datadict = {str(k): Data(groups.get_group(k).reset_index(drop=True)) for k in groups.groups}
 
-    #     """
-    #     return iter(self._datadict.values())
+    @property
+    def datadict(self) -> dict[str, Data]:
+        """Retrieve the dictionary of grouped Data objects.
 
-    # def _make_groups(self) -> None:
-    #     """Group the data by the specified tag and stores it in `datadict`."""
-    #     if self._by in self.dataframe.columns:
-    #         self._groups = self.dataframe.groupby(self._by)
-    #         self._datadict = {
-    #             str(k): Data(self._groups.get_group(k).reset_index(drop=True)) for k in self._groups.groups
-    #         }
-    #     else:
-    #         self._datadict = {"0": Data(self.dataframe)}
+        Returns
+        -------
+        dict of str, Data
+            Dictionary of grouped Data objects.
 
-    # @property
-    # def datadict(self) -> dict[str, Data]:
-    #     """Retrieve the dictionary of grouped Data objects.
+        """
+        return self._datadict
 
-    #     Returns
-    #     -------
-    #     dict of str, Data
-    #         Dictionary of grouped Data objects.
+    def tags(self) -> KeysView[str]:
+        """Return the tags associated with the data groups.
 
-    #     """
-    #     return self._datadict
+        Returns
+        -------
+        list of str
+            List of tags.
 
-    # def keys(self) -> list[str]:
-    #     """Return the tags associated with the data groups.
+        """
+        return self.datadict.keys()
 
-    #     Returns
-    #     -------
-    #     list of str
-    #         List of tags.
+    def items(self) -> ItemsView[str, Data]:
+        """Retrieve the items (tag and Data object) of the grouped data.
 
-    #     """
-    #     return list(self.datadict.keys())
+        Returns
+        -------
+        list of tuple of (str, Data)
+            List of tag-Data object pairs.
 
-    # def tags(self) -> list[str]:
-    #     """Return the tags associated with the data groups.
+        """
+        return self.datadict.items()
 
-    #     Returns
-    #     -------
-    #     list of str
-    #         List of tags.
+    @overload
+    def get(self, tag: str) -> Data: ...
 
-    #     """
-    #     return self.keys()
+    @overload
+    def get(self, tag: str, default: Data | NoDefault) -> Data: ...
 
-    # def items(self) -> list[tuple[str, Data]]:
-    #     """Retrieve the items (tag and Data object) of the grouped data.
+    @overload
+    def get(self, tag: str, default: None) -> Data | None: ...
 
-    #     Returns
-    #     -------
-    #     list of tuple of (str, Data)
-    #         List of tag-Data object pairs.
+    def get(self, tag, default=no_default):
+        """Retrieve the Data object associated with the specified tag.
 
-    #     """
-    #     return list(self.datadict.items())
+        Parameters
+        ----------
+        tag : str or None, optional
+            Tag of the data group to retrieve.
 
-    # def get(self, tag: str | None = None) -> Data:
-    #     """Retrieve the Data object associated with the specified tag.
+        Returns
+        -------
+        Data
+            Data object corresponding to the tag.
 
-    #     Parameters
-    #     ----------
-    #     tag : str or None, optional
-    #         Tag of the data group to retrieve.
+        """
+        if default is no_default:
+            return self.datadict[tag]
+        if default is None:
+            # note: this return statement seems nonsense, but without it type checker produces an
+            # error, somehow.
+            return self.datadict.get(tag, None)
+        return self.datadict.get(tag, default)
 
-    #     Returns
-    #     -------
-    #     Data
-    #         Data object corresponding to the tag.
+    @overload
+    def param(self, tag: str, key: int | str) -> NumericType: ...
 
-    #     """
-    #     if tag is None:
-    #         tag = self.keys()[0]
-    #     return self.datadict[tag]
+    @overload
+    def param(self, tag: str, key: Sequence) -> pd.Series: ...
 
-    # @overload
-    # def param(self, col: str, tag: str | None = None) -> NumericType: ...
+    def param(self, tag, key):
+        """Retrieve the first value(s) of the specified column(s) from a tagged Data object.
 
-    # @overload
-    # def param(self, col: list[str] | tuple[str], tag: str | None = None) -> list[NumericType]: ...
+        Parameters
+        ----------
+        col : str, list of str, or tuple of str
+            Column name or list of column names.
+        tag : str or None, optional
+            Tag of the data group to retrieve.
 
-    # def param(self, col, tag=None):
-    #     """Retrieve the first value(s) of the specified column(s) from a tagged Data object.
+        Returns
+        -------
+        NumericType or list of NumericType
+            First value(s) in the column(s).
 
-    #     Parameters
-    #     ----------
-    #     col : str, list of str, or tuple of str
-    #         Column name or list of column names.
-    #     tag : str or None, optional
-    #         Tag of the data group to retrieve.
-
-    #     Returns
-    #     -------
-    #     NumericType or list of NumericType
-    #         First value(s) in the column(s).
-
-    #     """
-    #     if tag is None:
-    #         tag = self.keys()[0]
-
-    #     if isinstance(col, str):
-    #         return self.datadict[tag].dataframe.loc[0, col]
-    #     if isinstance(col, Sequence):
-    #         return [self.datadict[tag].dataframe.loc[0, c] for c in col]
-
-    #     msg = f"unsupported type: {type(col)}"
-    #     raise TypeError(msg)
+        """
+        return self.get(tag).param(key)
 
 
 # Local Variables:
