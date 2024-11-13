@@ -1,10 +1,10 @@
 """Data Handling and Manipulation Module.
 
 This module provides classes for managing and manipulating tabular data, with functionalities to
-load data from various sources, grouped data structure by specified tags, and access columns or rows
+load data from various sources, group data structure by specified tags, and access columns or rows
 with intuitive syntax. The primary classes, `Data`, and `TaggedData`, facilitate working with
 tabular data in pandas DataFrame while allowing access to specific features like data grouping,
-dynamic attribute setting, and easy retrieval of minimum, maximum, and parameter values.
+dynamic attribute setting, and easy retrieval of parameter values.
 
 Classes
 -------
@@ -12,7 +12,7 @@ BaseData : Abstract base class providing the core attributes and methods for dat
     Defines basic properties for data path and DataFrame storage.
 
 Data : Extends BaseData to represent a single tabular data.
-    Provides methods to access columns and calculate minimum, maximum, and specific parameters.
+    Provides methods to access columns and retrieve specific parameters.
 
 TaggedData : Extends BaseData to handle grouped data based on a specified tag column.
     Allows grouping data by a tag and accessing each group as a separate `Data` object.
@@ -56,6 +56,8 @@ Unknown: TypeAlias = Any
 
 
 class _NoDefault(Enum):
+    """Enum to represent the absence of a default value in method parameters."""
+
     no_default = auto()
 
 
@@ -66,7 +68,7 @@ NoDefault: TypeAlias = Literal[_NoDefault.no_default]
 class BaseData:
     """Base class for data handling and manipulation.
 
-    This class has functionalities for setting and retrieving the path and the main DataFrame
+    This class provides functionalities for setting and retrieving the path and the main DataFrame
     associated with the data.
 
     """
@@ -89,10 +91,20 @@ class BaseData:
 
         Parameters
         ----------
-        data : str, Path, StringIO, or pd.DataFrame
+        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
             The data source.
-        **kwds : dict, optional
-            Additional keyword arguments passed to `pd.read_csv`.
+        sep : str
+            Delimiter for CSV data.
+        header : int or Sequence[int] or Literal["infer"], optional
+            Row(s) to use as the column names.
+        names : Sequence[Hashable], optional
+            Column names to use.
+        usecols : Sequence[Hashable] or range, optional
+            Columns to read from the data source.
+        nrows : int, optional
+            Number of rows to read.
+        comment : str, optional
+            Character to indicate comments in the data file.
 
         Raises
         ------
@@ -124,10 +136,21 @@ class BaseData:
 
     @staticmethod
     def read_commented_column_names(file_or_buffer: FilePath | StringIO, *, sep: str, comment: str) -> list[str] | None:
-        """Return a list of column names.
+        """Return a list of column names extracted from commented lines in the file.
 
-        File or string buffer are assumed to start lines with commented lines. The last commented
-        line is split with `sep`. The split strings are returned as a list of column names.
+        Parameters
+        ----------
+        file_or_buffer : str | Path | StringIO
+            The file or buffer containing the data.
+        sep : str
+            Delimiter for the data.
+        comment : str
+            Character indicating commented lines.
+
+        Returns
+        -------
+        list of str or None
+            List of column names if found; otherwise, None.
 
         """
 
@@ -160,7 +183,31 @@ class BaseData:
         nrows: int | None,
         comment: str | None,
     ) -> pd.DataFrame:
-        """Return a pandas DataFrame loaded from a file or string buffer."""
+        """Return a pandas DataFrame loaded from a file or string buffer.
+
+        Parameters
+        ----------
+        file_or_buffer : str | Path | StringIO
+            The file or buffer to read from.
+        sep : str, optional
+            Delimiter for the data.
+        header : int or Sequence[int] or Literal["infer"], optional
+            Row(s) to use as the column names.
+        names : Sequence[Hashable], optional
+            Column names to use.
+        usecols : Sequence[Hashable] or range, optional
+            Columns to read from the data source.
+        nrows : int, optional
+            Number of rows to read.
+        comment : str, optional
+            Character to indicate comments in the data file.
+
+        Returns
+        -------
+        pd.DataFrame
+            The loaded DataFrame.
+
+        """
         if comment is not None and names is None:
             names = BaseData.read_commented_column_names(file_or_buffer, sep=sep, comment=comment)
         if isinstance(file_or_buffer, StringIO):
@@ -184,11 +231,6 @@ class BaseData:
         ----------
         dataframe : pd.DataFrame
             The DataFrame to associate with the data.
-
-        Raises
-        ------
-        TypeError
-            If the provided df is not a DataFrame.
 
         """
         self._dataframe = dataframe
@@ -218,7 +260,14 @@ class BaseData:
         return self.dataframe
 
     def is_loaded_from_file(self) -> bool:
-        """Check if `Data` object is loaded from a file."""
+        """Check if the Data object was loaded from a file.
+
+        Returns
+        -------
+        bool
+            True if loaded from a file; otherwise, False.
+
+        """
         try:
             _ = self._datapath
         except AttributeError:
@@ -242,8 +291,8 @@ class BaseData:
 
         Returns
         -------
-        Path or None
-            Path to the data file, if set; otherwise, None.
+        Path
+            Path to the data file.
 
         """
         try:
@@ -258,28 +307,66 @@ class BaseData:
 
         Returns
         -------
-        Path or None
-            Directory of the data file, if the path is set; otherwise, None.
+        Path
+            Directory of the data file.
 
         """
         return self.datapath.parent
 
     def __str__(self) -> str:
-        """Return a string representation of the DataFrame.
+        """Return a string of the associated DataFrame.
 
         Returns
         -------
         str
-            String representation of the DataFrame.
+            String representation of the associated DataFrame object.
 
         """
-        return str(self._dataframe)
+        return str(self.dataframe)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns
+        -------
+        str
+            String representation of the object.
+
+        """
+        if self.is_loaded_from_file():
+            return f"{self.__class__.__name__}({self.datapath})"
+        return f"{self.__class__.__name__}({self.dataframe})"
 
 
 class Data(BaseData):
-    """Class for handling and manipulating tabular data.
+    """A class representing tabular data loaded from a source.
 
-    This class has methods for accessing, retrieving, and setting data attributes.
+    This class provides methods for easy data access and specific data parameter extraction. When
+    the source data contains column names, this class provides attributes for access the data column
+    with its name.
+
+    Attributes
+    ----------
+    dataframe : pd.DataFrame
+        The DataFrame containing the tabular data.
+    datapath : Path
+        The path to the data file.
+    datadir : Path
+        The directory of the data file
+
+    Examples
+    --------
+    Initialization of the data object and access for column data with its name.
+
+    >>> import pandas as pd
+    >>> data = Data(pd.DataFrame({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3], "c": [5, 5, 5]}))
+    >>> data.a
+    0    1
+    1    2
+    2    3
+    Name: a, dtype: int64
+    >>> data.param("c")
+    np.int64(5)
 
     """
 
@@ -294,14 +381,24 @@ class Data(BaseData):
         nrows: int | None = None,
         comment: str | None = None,
     ) -> None:
-        """Initialize the Data object with the provided data source.
+        """Initialize the BaseData object with the provided data source.
 
         Parameters
         ----------
-        data : str, Path, StringIO, or pd.DataFrame
+        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
             The data source.
-        **kwds : dict, optional
-            Additional keyword arguments passed to `pd.read_csv`.
+        sep : str
+            Delimiter for CSV data.
+        header : int or Sequence[int] or Literal["infer"], optional
+            Row(s) to use as the column names.
+        names : Sequence[Hashable], optional
+            Column names to use.
+        usecols : Sequence[Hashable] or range, optional
+            Columns to read from the data source.
+        nrows : int, optional
+            Number of rows to read.
+        comment : str, optional
+            Character to indicate comments in the data file.
 
         Raises
         ------
@@ -320,28 +417,28 @@ class Data(BaseData):
         )
 
     def __getitem__(self, key: Unknown) -> pd.Series | pd.DataFrame:
-        """Access a specific column or row by key.
+        """Access a specific column(s).
 
         Parameters
         ----------
-        key : str or int
-            Column name or row index.
+        key : str or int or Sequence of str or int
+            Column name or column index.
 
         Returns
         -------
-        pd.Series
-            The column or row data as a Series.
+        pd.Series or pd.DataFrame
+            Series or frame of the specified column(s).
 
         """
         return self.dataframe.__getitem__(key)
 
     def __len__(self) -> int:
-        """Return the number of rows in the DataFrame.
+        """Return the number of rows in the `Data` object.
 
         Returns
         -------
         int
-            Number of rows in the DataFrame.
+            Number of rows in the `Data` object.
 
         """
         return len(self.dataframe)
@@ -356,7 +453,7 @@ class Data(BaseData):
 
         Returns
         -------
-        Any
+        Unknown
             The attribute from the DataFrame.
 
         """
@@ -371,17 +468,17 @@ class Data(BaseData):
     def param(self, key: Sequence) -> pd.Series: ...
 
     def param(self, key):
-        """Retrieve the first value(s) of the specified column(s).
+        """Retrieve specific parameter(s) for column(s).
 
         Parameters
         ----------
-        col : str, list of str, or tuple of str
-            Column name or list of column names.
+        key : int or str or Sequence of int or str
+            The column(s) for which to retrieve the parameter.
 
         Returns
         -------
-        NumericType or list of NumericType
-            First value(s) in the column(s).
+        Numeric type or pd.Series
+            Retrieved parameter value(s).
 
         """
         row = self.dataframe.loc[0, key]
@@ -391,9 +488,22 @@ class Data(BaseData):
 
 
 class TaggedData(BaseData):
-    """Class for managing data tagged by a specific column for easy access by group."""
+    """A class for handling data grouped by a specified tag.
+
+    This class provides methods to load and access data grouped by a tag, enabling
+    easy access to each group's data as individual `Data` objects.
+
+    Attributes
+    ----------
+    dataframe : pd.DataFrame
+        The DataFrame containing the tabular data with tags.
+    datadict : dict of str to Data
+        A dictionary mapping each tag value to a corresponding `Data` object.
+
+    """
 
     _datadict: dict[str, Data]
+    _tag: Unknown
 
     def __init__(
         self,
@@ -407,14 +517,26 @@ class TaggedData(BaseData):
         comment: str | None = None,
         tag: Unknown = "tag",
     ) -> None:
-        """Initialize the Data object with the provided data source.
+        """Initialize the BaseData object with the provided data source.
 
         Parameters
         ----------
-        data : str, Path, StringIO, or pd.DataFrame
+        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
             The data source.
-        **kwds : dict, optional
-            Additional keyword arguments passed to `pd.read_csv`.
+        sep : str
+            Delimiter for CSV data.
+        header : int or Sequence[int] or Literal["infer"], optional
+            Row(s) to use as the column names.
+        names : Sequence[Hashable], optional
+            Column names to use.
+        usecols : Sequence[Hashable] or range, optional
+            Columns to read from the data source.
+        nrows : int, optional
+            Number of rows to read.
+        comment : str, optional
+            Character to indicate comments in the data file.
+        tag : str, optional
+            Column name used to tag and group data.
 
         Raises
         ------
@@ -431,7 +553,8 @@ class TaggedData(BaseData):
             nrows=nrows,
             comment=comment,
         )
-        self._make_groups(tag)
+        self._tag = tag
+        self._make_groups(self._tag)
 
     def __iter__(self) -> Iterator[Data]:
         """Return an iterator over the grouped Data objects.
@@ -471,8 +594,8 @@ class TaggedData(BaseData):
 
         Returns
         -------
-        list of str
-            List of tags.
+        KeysView of str
+            Dictionary keys of tags.
 
         """
         return self.datadict.keys()
@@ -482,8 +605,8 @@ class TaggedData(BaseData):
 
         Returns
         -------
-        list of tuple of (str, Data)
-            List of tag-Data object pairs.
+        ItemsView of tuple of (str, Data)
+            Dictionary items of tag-Data object pairs.
 
         """
         return self.datadict.items()
@@ -502,13 +625,21 @@ class TaggedData(BaseData):
 
         Parameters
         ----------
-        tag : str or None, optional
+        tag : str
             Tag of the data group to retrieve.
+
+        default : Data or None, optional
+            The default data object when the specified tag is not found.
 
         Returns
         -------
         Data
             Data object corresponding to the tag.
+
+        Raises
+        ------
+        KeyError
+            If the specified tag value does not exist and no default value is given.
 
         """
         if default is no_default:
@@ -526,24 +657,49 @@ class TaggedData(BaseData):
     def param(self, tag: str, key: Sequence) -> pd.Series: ...
 
     def param(self, tag, key):
-        """Retrieve the first value(s) of the specified column(s) from a tagged Data object.
+        """Retrieve specific parameter(s) for column(s) from a tagged Data object.
 
         Parameters
         ----------
-        col : str, list of str, or tuple of str
-            Column name or list of column names.
-        tag : str or None, optional
+        tag : str
             Tag of the data group to retrieve.
+
+        key : int or str or Sequence of int or str
+            The column(s) for which to compute the parameter.
 
         Returns
         -------
-        NumericType or list of NumericType
-            First value(s) in the column(s).
+        Numeric type or pd.Series
+            Computed parameter value(s).
 
         """
         return self.get(tag).param(key)
 
+    def __str__(self) -> str:
+        """Return a string of the grouped mapping of tag to Data.
+
+        Returns
+        -------
+        str
+            String representation of the grouped mapping of tag to Data.
+
+        """
+        return str(self.datadict)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns
+        -------
+        str
+            String representation of the object.
+
+        """
+        if self.is_loaded_from_file():
+            return f"{self.__class__.__name__}({self.datapath}, tag={self._tag})"
+        return f"{self.__class__.__name__}({self.dataframe}, tag={self._tag})"
+
 
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datadir dataframe datapath df noqa param sep str"
+# jinx-local-words: "Enum Hashable StringIO csv datadict datadir dataframe datapath dtype np nrows param sep str usecols" # noqa: E501
 # End:
