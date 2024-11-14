@@ -461,6 +461,32 @@ class Data(BaseData):
             return self.__getattribute__(name)
         return getattr(self.dataframe, name)
 
+    def split_by_row(self, row_index: int, *, reset_index: bool = True) -> tuple[Data, Data]:
+        """Split the Data object into two parts at a specified row index.
+
+        Parameters
+        ----------
+        row_index : int
+            The index at which to split the data object. Rows from the start up to
+            `row_index` will go to the first split, and rows from `row_index` to
+            the end will go to the second split.
+        reset_index : bool, optional
+            Whether to reset the index of the second split data, by default True.
+
+        Returns
+        -------
+        tuple[Data, Data]
+            A tuple containing two Data objects. The first contains rows from the
+            start to `row_index`, and the second contains rows from `row_index`
+            to the end, with the index reset if `reset_index` is True.
+
+        """
+        df1 = self.dataframe.iloc[:row_index]
+        df2 = self.dataframe.iloc[row_index:]
+        if reset_index:
+            df2 = df2.reset_index(drop=True)
+        return Data(df1), Data(df2)
+
     @overload
     def param(self, key: int | str) -> NumericType: ...
 

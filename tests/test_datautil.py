@@ -351,6 +351,18 @@ def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
     pt.assert_series_equal(data.c, toy_dataframe.c)
 
 
+@pytest.mark.parametrize("row_index", [1, 2])
+def test_data_split(default_data: Data, row_index: int) -> None:
+    """Test splitting a Data object into two objects by row index."""
+    n_rows = len(default_data)
+    n_cols = len(default_data.columns)
+    train_data, test_data = default_data.split_by_row(row_index)
+    assert train_data.shape == (row_index, n_cols)
+    pt.assert_index_equal(train_data.index, pd.RangeIndex(stop=row_index))
+    assert test_data.shape == (n_rows - row_index, n_cols)
+    pt.assert_index_equal(test_data.index, pd.RangeIndex(stop=n_rows - row_index))
+
+
 @pytest.mark.parametrize(
     ("col", "expected"),
     [
