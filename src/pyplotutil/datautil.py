@@ -36,9 +36,9 @@ and other applications requiring structured data handling.
 from __future__ import annotations
 
 from enum import Enum, auto
-from io import StringIO, TextIOWrapper
+from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Final, Literal, TextIO, TypeAlias, TypeVar, overload
 
 import numpy as np
 import pandas as pd
@@ -154,7 +154,7 @@ class BaseData:
 
         """
 
-        def last_commented_header(buffer: TextIOWrapper, comment: str) -> str:
+        def last_commented_header(buffer: TextIO, comment: str) -> str:
             header = ""
             for line in buffer:
                 if line.startswith(comment):
