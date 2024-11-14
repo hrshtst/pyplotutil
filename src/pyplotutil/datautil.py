@@ -461,6 +461,17 @@ class Data(BaseData):
             return self.__getattribute__(name)
         return getattr(self.dataframe, name)
 
+    def __iter__(self) -> Iterator[np.ndarray]:
+        """Return an iterator over the Data objects.
+
+        Returns
+        -------
+        Iterator[np.ndarray]
+            An iterator over the Data objects.
+
+        """
+        return iter(self.dataframe.to_numpy())
+
     def split_by_row(self, row_index: int, *, reset_index: bool = True) -> tuple[Data, Data]:
         """Split the Data object into two parts at a specified row index.
 
@@ -727,5 +738,5 @@ class TaggedData(BaseData):
 
 
 # Local Variables:
-# jinx-local-words: "Enum Hashable StringIO csv datadict datadir dataframe datapath dtype np nrows param sep str usecols" # noqa: E501
+# jinx-local-words: "Enum Hashable StringIO csv datadict datadir dataframe datapath dtype ndarray np nrows param sep str usecols" # noqa: E501
 # End:

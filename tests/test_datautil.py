@@ -14,6 +14,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import numpy.testing as nt
 import pandas as pd
 import pandas.testing as pt
 import pytest
@@ -349,6 +350,14 @@ def test_data_attributes(toy_dataframe: pd.DataFrame) -> None:
     pt.assert_series_equal(data.a, toy_dataframe.a)
     pt.assert_series_equal(data.b, toy_dataframe.b)
     pt.assert_series_equal(data.c, toy_dataframe.c)
+
+
+def test_data_iterator(toy_dataframe: pd.DataFrame) -> None:
+    """Test iteration over Data object."""
+    data = Data(toy_dataframe)
+    expected = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+    for values, e in zip(data, expected, strict=True):
+        nt.assert_array_equal(values, e)
 
 
 @pytest.mark.parametrize("row_index", [1, 2])
