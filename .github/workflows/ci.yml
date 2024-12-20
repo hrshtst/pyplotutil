@@ -41,8 +41,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Nox-under-test
-        run: python -m pip install --disable-pip-version-check .
+      - name: Upgrade nox
+        run: |
+          python -m pip install --upgrade 'nox[uv]'
+          nox --version
 
       - name: Run lints
         run: nox --non-interactive --error-on-missing-interpreter --session "lint"
@@ -81,8 +83,10 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Install Nox-under-test (uv)
-        run:  uv pip install --system .
+      - name: Upgrade nox
+        run: |
+          python -m pip install --upgrade 'nox[uv]'
+          nox --version
 
       - name: Run tests on ${{ matrix.os }}
         run: nox --non-interactive --error-on-missing-interpreter --session "tests-${{ matrix.python-version }}" -- --full-trace
