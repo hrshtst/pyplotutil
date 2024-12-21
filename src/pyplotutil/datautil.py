@@ -35,34 +35,21 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
-from enum import Enum, auto
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Literal, TextIO, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, TextIO, overload
 
-import numpy as np
 import pandas as pd
+
+from pyplotutil._typing import FilePath, NoDefault, NumericType, Unknown, no_default
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, ItemsView, Iterator, KeysView, Sequence
 
+    import numpy as np
     from pandas.io.parsers.readers import UsecolsArgType
 
-FilePath: TypeAlias = str | Path
-DataSourceType: TypeAlias = FilePath | StringIO | pd.DataFrame | pd.Series
-NumericType: TypeAlias = int | float | complex | np.number
-NumericTypeVar = TypeVar("NumericTypeVar", bound=NumericType)
-Unknown: TypeAlias = Any
-
-
-class _NoDefault(Enum):
-    """Enum to represent the absence of a default value in method parameters."""
-
-    no_default = auto()
-
-
-no_default: Final = _NoDefault.no_default
-NoDefault: TypeAlias = Literal[_NoDefault.no_default]
+    from pyplotutil._typing import DataSourceType
 
 
 class BaseData:
