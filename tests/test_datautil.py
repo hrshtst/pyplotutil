@@ -19,7 +19,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 
-from pyplotutil.datautil_polars import Data, TaggedData
+from pyplotutil.datautil import Data, TaggedData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

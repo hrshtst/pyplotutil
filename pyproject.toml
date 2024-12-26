@@ -15,7 +15,6 @@ maintainers = [
 dependencies = [
     "matplotlib>=3.10.0",
     "numpy>=2.2.0",
-    "pandas>=2.2.3",
     "polars>=1.17.1",
     "pyqt6>=6.8.0",
 ]
@@ -163,7 +162,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.pyright]
-include = ["src"]
+include = ["src", "tests"]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -180,7 +179,6 @@ check_untyped_defs = true       # Type-checks the interior of functions without 
 module = [
   "numpy.*",
   "scipy.*",
-  "pandas.*",
 ]
 ignore_missing_imports = true
 
