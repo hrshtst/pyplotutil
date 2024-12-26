@@ -3,7 +3,7 @@
 This module provides classes for managing and manipulating tabular data, with functionalities to
 load data from various sources, group data structure by specified tags, and access columns or rows
 with intuitive syntax. The primary classes, `Data`, and `TaggedData`, facilitate working with
-tabular data in pandas DataFrame while allowing access to specific features like data grouping,
+tabular data in polars DataFrame while allowing access to specific features like data grouping,
 dynamic attribute setting, and easy retrieval of parameter values.
 
 Classes
@@ -37,17 +37,27 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TextIO, overload
+from typing import TYPE_CHECKING, TextIO, overload
 
-import pandas as pd
+import polars as pl
+from polars.exceptions import ColumnNotFoundError
 
-from pyplotutil._typing import FilePath, NoDefault, NumericType, Unknown, no_default
+from pyplotutil._typing import (
+    FilePath,
+    MultiColSelector,
+    MultiIndexSelector,
+    NoDefault,
+    NumericType,
+    SingleColSelector,
+    SingleIndexSelector,
+    Unknown,
+    no_default,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, ItemsView, Iterator, KeysView, Sequence
+    from collections.abc import ItemsView, Iterator, KeysView, Sequence
 
     import numpy as np
-    from pandas.io.parsers.readers import UsecolsArgType
 
     from pyplotutil._typing import DataSourceType
 
@@ -61,34 +71,34 @@ class BaseData:
     """
 
     _datapath: Path
-    _dataframe: pd.DataFrame
+    _dataframe: pl.DataFrame
 
     def __init__(
         self,
         data_source: DataSourceType,
         *,
-        sep: str,
-        header: int | Sequence[int] | Literal["infer"] | None,
-        names: Sequence[Hashable] | None,
-        usecols: UsecolsArgType,
-        nrows: int | None,
+        separator: str,
+        has_header: bool,
+        columns: Sequence[int] | Sequence[str] | None,
+        names: Sequence[str] | None,
+        n_rows: int | None,
         comment: str | None,
     ) -> None:
         """Initialize the BaseData object with the provided data source.
 
         Parameters
         ----------
-        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
+        data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
-        sep : str
-            Delimiter for CSV data.
-        header : int or Sequence[int] or Literal["infer"], optional
-            Row(s) to use as the column names.
-        names : Sequence[Hashable], optional
-            Column names to use.
-        usecols : Sequence[Hashable] or range, optional
+        separator : str
+            Single byte character to use as separator in the file.
+        has_header : bool, optional
+            Indicate if the first row of the dataset is a header or not.
+        columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
-        nrows : int, optional
+        names : Sequence[str], optional
+            Rename columns right after parsing the CSV file.
+        n_rows : int, optional
             Number of rows to read.
         comment : str, optional
             Character to indicate comments in the data file.
@@ -99,19 +109,19 @@ class BaseData:
             If the data type is unsupported.
 
         """
-        if isinstance(data_source, pd.DataFrame):
+        if isinstance(data_source, pl.DataFrame):
             self._set_dataframe(data_source)
-        elif isinstance(data_source, pd.Series):
+        elif isinstance(data_source, pl.Series):
             self._set_dataframe(data_source.to_frame())
         elif isinstance(data_source, StringIO | FilePath):
             self._set_dataframe(
                 self.read_csv(
                     data_source,
-                    sep=sep,
-                    header=header,
+                    separator=separator,
+                    has_header=has_header,
+                    columns=columns,
                     names=names,
-                    usecols=usecols,
-                    nrows=nrows,
+                    n_rows=n_rows,
                     comment=comment,
                 ),
             )
@@ -122,15 +132,20 @@ class BaseData:
             raise TypeError(msg)
 
     @staticmethod
-    def read_commented_column_names(file_or_buffer: FilePath | StringIO, *, sep: str, comment: str) -> list[str] | None:
+    def read_commented_column_names(
+        file_or_buffer: FilePath | StringIO,
+        *,
+        separator: str,
+        comment: str,
+    ) -> list[str] | None:
         """Return a list of column names extracted from commented lines in the file.
 
         Parameters
         ----------
         file_or_buffer : str | Path | StringIO
             The file or buffer containing the data.
-        sep : str
-            Delimiter for the data.
+        separator : str
+            Single byte character to use as separator in the file..
         comment : str
             Character indicating commented lines.
 
@@ -156,91 +171,96 @@ class BaseData:
         else:
             header = last_commented_header(file_or_buffer, comment)
         if len(header) > 0:
-            return header[1:].strip().split(sep)
+            n = len(comment)
+            names = header[n:].strip().split(separator)
+            if len(names) == 1 and names[0] == "":
+                names = []
+            return names
         return None
 
     @staticmethod
     def read_csv(
         file_or_buffer: FilePath | StringIO,
         *,
-        sep: str = ",",
-        header: int | Sequence[int] | Literal["infer"] | None,
-        names: Sequence[Hashable] | None,
-        usecols: UsecolsArgType,
-        nrows: int | None,
+        separator: str,
+        has_header: bool,
+        columns: Sequence[int] | Sequence[str] | None,
+        names: Sequence[str] | None,
+        n_rows: int | None,
         comment: str | None,
-    ) -> pd.DataFrame:
-        """Return a pandas DataFrame loaded from a file or string buffer.
+    ) -> pl.DataFrame:
+        """Return a polars DataFrame loaded from a file or string buffer.
 
         Parameters
         ----------
         file_or_buffer : str | Path | StringIO
             The file or buffer to read from.
-        sep : str, optional
-            Delimiter for the data.
-        header : int or Sequence[int] or Literal["infer"], optional
-            Row(s) to use as the column names.
-        names : Sequence[Hashable], optional
-            Column names to use.
-        usecols : Sequence[Hashable] or range, optional
+        separator : str, optional
+            Single byte character to use as separator in the file..
+        has_header : bool, optional
+            Indicate if the first row of the dataset is a header or not.
+        columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
-        nrows : int, optional
+        names : Sequence[str], optional
+            Rename columns right after parsing the CSV file.
+        n_rows : int, optional
             Number of rows to read.
         comment : str, optional
             Character to indicate comments in the data file.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
             The loaded DataFrame.
 
         """
         if comment is not None and names is None:
-            names = BaseData.read_commented_column_names(file_or_buffer, sep=sep, comment=comment)
+            names = BaseData.read_commented_column_names(file_or_buffer, separator=separator, comment=comment)
+            if names is not None:
+                has_header = False
         if isinstance(file_or_buffer, StringIO):
             file_or_buffer.seek(0)
-        return pd.read_csv(
+        return pl.read_csv(
             file_or_buffer,
-            sep=sep,
-            header=header,
-            names=names,
-            usecols=usecols,
-            nrows=nrows,
-            comment=comment,
-            iterator=False,
-            chunksize=None,
+            has_header=has_header,
+            columns=columns,
+            new_columns=names,
+            separator=separator,
+            comment_prefix=comment,
+            n_rows=n_rows,
+            rechunk=True,
         )
 
-    def _set_dataframe(self, dataframe: pd.DataFrame) -> None:
+    def _set_dataframe(self, dataframe: pl.DataFrame) -> None:
         """Set the DataFrame associated with the data object.
 
         Parameters
         ----------
-        dataframe : pd.DataFrame
+        dataframe : pl.DataFrame
             The DataFrame to associate with the data.
 
         """
         self._dataframe = dataframe
 
     @property
-    def dataframe(self) -> pd.DataFrame:
+    def dataframe(self) -> pl.DataFrame:
         """Retrieve the raw DataFrame associated with the data.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
             The DataFrame associated with the data.
 
         """
         return self._dataframe
 
     @property
-    def df(self) -> pd.DataFrame:
+    def df(self) -> pl.DataFrame:
         """Alias for `dataframe` attribute.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
             The DataFrame associated with the data.
 
         """
@@ -334,7 +354,7 @@ class Data(BaseData):
 
     Attributes
     ----------
-    dataframe : pd.DataFrame
+    dataframe : pl.DataFrame
         The DataFrame containing the tabular data.
     datapath : Path
         The path to the data file.
@@ -345,8 +365,8 @@ class Data(BaseData):
     --------
     Initialization of the data object and access for column data with its name.
 
-    >>> import pandas as pd
-    >>> data = Data(pd.DataFrame({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3], "c": [5, 5, 5]}))
+    >>> import polars as pl
+    >>> data = Data(pl.DataFrame({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3], "c": [5, 5, 5]}))
     >>> data.a
     0    1
     1    2
@@ -361,28 +381,28 @@ class Data(BaseData):
         self,
         data_source: DataSourceType,
         *,
-        sep: str = ",",
-        header: int | Sequence[int] | Literal["infer"] | None = "infer",
-        names: Sequence[Hashable] | None = None,
-        usecols: UsecolsArgType = None,
-        nrows: int | None = None,
+        separator: str = ",",
+        has_header: bool = True,
+        columns: Sequence[int] | Sequence[str] | None = None,
+        names: Sequence[str] | None = None,
+        n_rows: int | None = None,
         comment: str | None = None,
     ) -> None:
         """Initialize the BaseData object with the provided data source.
 
         Parameters
         ----------
-        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
+        data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
-        sep : str
-            Delimiter for CSV data.
-        header : int or Sequence[int] or Literal["infer"], optional
-            Row(s) to use as the column names.
-        names : Sequence[Hashable], optional
-            Column names to use.
-        usecols : Sequence[Hashable] or range, optional
+        separator : str
+            Single byte character to use as separator in the file.
+        has_header : bool, optional
+            Indicate if the first row of the dataset is a header or not.
+        columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
-        nrows : int, optional
+        names : Sequence[str], optional
+            Rename columns right after parsing the CSV file.
+        n_rows : int, optional
             Number of rows to read.
         comment : str, optional
             Character to indicate comments in the data file.
@@ -395,15 +415,48 @@ class Data(BaseData):
         """
         super().__init__(
             data_source,
-            sep=sep,
-            header=header,
+            separator=separator,
+            has_header=has_header,
+            columns=columns,
             names=names,
-            usecols=usecols,
-            nrows=nrows,
+            n_rows=n_rows,
             comment=comment,
         )
 
-    def __getitem__(self, key: Unknown) -> pd.Series | pd.DataFrame:
+    @overload
+    def __getitem__(self, key: tuple[SingleIndexSelector, SingleColSelector]) -> Unknown: ...
+
+    @overload
+    def __getitem__(  # type: ignore[overload-overlap]
+        self,
+        key: str | tuple[MultiIndexSelector, SingleColSelector],
+    ) -> pl.Series: ...
+
+    @overload
+    def __getitem__(
+        self,
+        key: (
+            SingleIndexSelector
+            | MultiIndexSelector
+            | MultiColSelector
+            | tuple[SingleIndexSelector, MultiColSelector]
+            | tuple[MultiIndexSelector, MultiColSelector]
+        ),
+    ) -> pl.DataFrame: ...
+
+    def __getitem__(
+        self,
+        key: (
+            SingleIndexSelector
+            | SingleColSelector
+            | MultiColSelector
+            | MultiIndexSelector
+            | tuple[SingleIndexSelector, SingleColSelector]
+            | tuple[SingleIndexSelector, MultiColSelector]
+            | tuple[MultiIndexSelector, SingleColSelector]
+            | tuple[MultiIndexSelector, MultiColSelector]
+        ),
+    ) -> pl.DataFrame | pl.Series | Unknown:
         """Access a specific column(s).
 
         Parameters
@@ -413,7 +466,7 @@ class Data(BaseData):
 
         Returns
         -------
-        pd.Series or pd.DataFrame
+        pl.Series or pl.DataFrame
             Series or frame of the specified column(s).
 
         """
@@ -446,6 +499,8 @@ class Data(BaseData):
         """
         if name in ("datapath", "datadir"):
             return self.__getattribute__(name)
+        if name in self.dataframe.columns:
+            return self.dataframe.get_column(name)
         return getattr(self.dataframe, name)
 
     def __iter__(self) -> Iterator[np.ndarray]:
@@ -459,7 +514,7 @@ class Data(BaseData):
         """
         return iter(self.dataframe.to_numpy())
 
-    def split_by_row(self, row_index: int, *, reset_index: bool = True) -> tuple[Data, Data]:
+    def split_by_row(self, row_index: int) -> tuple[Data, Data]:
         """Split the Data object into two parts at a specified row index.
 
         Parameters
@@ -468,28 +523,24 @@ class Data(BaseData):
             The index at which to split the data object. Rows from the start up to
             `row_index` will go to the first split, and rows from `row_index` to
             the end will go to the second split.
-        reset_index : bool, optional
-            Whether to reset the index of the second split data, by default True.
 
         Returns
         -------
         tuple[Data, Data]
             A tuple containing two Data objects. The first contains rows from the
             start to `row_index`, and the second contains rows from `row_index`
-            to the end, with the index reset if `reset_index` is True.
+            to the end.
 
         """
-        df1 = self.dataframe.iloc[:row_index]
-        df2 = self.dataframe.iloc[row_index:]
-        if reset_index:
-            df2 = df2.reset_index(drop=True)
+        df1 = self.dataframe[:row_index]
+        df2 = self.dataframe[row_index:]
         return Data(df1), Data(df2)
 
     @overload
     def param(self, key: int | str) -> NumericType: ...
 
     @overload
-    def param(self, key: Sequence) -> pd.Series: ...
+    def param(self, key: Sequence) -> tuple[NumericType, ...]: ...
 
     def param(self, key):
         """Retrieve specific parameter(s) for column(s).
@@ -501,14 +552,14 @@ class Data(BaseData):
 
         Returns
         -------
-        Numeric type or pd.Series
+        Numeric type or pl.Series
             Retrieved parameter value(s).
 
         """
-        row = self.dataframe.loc[0, key]
-        if isinstance(row, pd.Series | pd.DataFrame):
-            row = pd.to_numeric(row)
-        return row
+        subset = self.dataframe[:, key]
+        if isinstance(subset, pl.Series):
+            return subset[0]
+        return subset.row(0)
 
 
 class TaggedData(BaseData):
@@ -519,7 +570,7 @@ class TaggedData(BaseData):
 
     Attributes
     ----------
-    dataframe : pd.DataFrame
+    dataframe : pl.DataFrame
         The DataFrame containing the tabular data with tags.
     datadict : dict of str to Data
         A dictionary mapping each tag value to a corresponding `Data` object.
@@ -527,39 +578,39 @@ class TaggedData(BaseData):
     """
 
     _datadict: dict[str, Data]
-    _tag: Unknown
+    _tag_column_name: str
 
     def __init__(
         self,
         data_source: DataSourceType,
         *,
-        sep: str = ",",
-        header: int | Sequence[int] | Literal["infer"] | None = "infer",
-        names: Sequence[Hashable] | None = None,
-        usecols: UsecolsArgType = None,
-        nrows: int | None = None,
+        separator: str = ",",
+        has_header: bool = True,
+        columns: Sequence[int] | Sequence[str] | None = None,
+        names: Sequence[str] | None = None,
+        n_rows: int | None = None,
         comment: str | None = None,
-        tag: Unknown = "tag",
+        tag_column: str = "tag",
     ) -> None:
         """Initialize the BaseData object with the provided data source.
 
         Parameters
         ----------
-        data_source : str | Path | StringIO | pd.DataFrame | pd.Series
+        data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
-        sep : str
-            Delimiter for CSV data.
-        header : int or Sequence[int] or Literal["infer"], optional
-            Row(s) to use as the column names.
-        names : Sequence[Hashable], optional
-            Column names to use.
-        usecols : Sequence[Hashable] or range, optional
+        separator : str
+            Single byte character to use as separator in the file.
+        has_header : bool, optional
+            Indicate if the first row of the dataset is a header or not.
+        columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
-        nrows : int, optional
+        names : Sequence[str], optional
+            Rename columns right after parsing the CSV file.
+        n_rows : int, optional
             Number of rows to read.
         comment : str, optional
             Character to indicate comments in the data file.
-        tag : str, optional
+        tag_column : str, optional
             Column name used to tag and group data.
 
         Raises
@@ -570,36 +621,49 @@ class TaggedData(BaseData):
         """
         super().__init__(
             data_source,
-            sep=sep,
-            header=header,
+            separator=separator,
+            has_header=has_header,
+            columns=columns,
             names=names,
-            usecols=usecols,
-            nrows=nrows,
+            n_rows=n_rows,
             comment=comment,
         )
-        self._tag = tag
-        self._make_groups(self._tag)
+        self._tag_column_name = tag_column
+        self._make_groups(self._tag_column_name)
 
-    def __iter__(self) -> Iterator[Data]:
+    def __iter__(self) -> Iterator[tuple[str, Data]]:
         """Return an iterator over the grouped Data objects.
+
+        Each group is represented by a tuple of (tag, Data).
 
         Returns
         -------
-        Iterator[Data]
+        Iterator[tuple[str, Data]]
             An iterator over the grouped Data objects.
 
         """
-        return iter(self.datadict.values())
+        return iter(self.datadict.items())
 
-    def _make_groups(self, by: Unknown) -> None:
+    def __len__(self) -> int:
+        """Return the number of Data objects divided by the tag.
+
+        Returns
+        -------
+        int
+            Number of Data objects divided by the tag.
+
+        """
+        return len(self._datadict)
+
+    def _make_groups(self, tag_column_name: str) -> None:
         """Group the data by the specified tag and stores it in `datadict`."""
-        self._datadict = {}
         try:
-            groups = self.dataframe.groupby(by)
-        except KeyError:
+            self._datadict = {
+                str(name[0]): Data(group.drop(tag_column_name))
+                for name, group in self.dataframe.group_by(tag_column_name)
+            }
+        except ColumnNotFoundError:
             self._datadict = {"unknown": Data(self.dataframe)}
-        else:
-            self._datadict = {str(k): Data(groups.get_group(k).reset_index(drop=True)) for k in groups.groups}
 
     @property
     def datadict(self) -> dict[str, Data]:
@@ -678,7 +742,7 @@ class TaggedData(BaseData):
     def param(self, tag: str, key: int | str) -> NumericType: ...
 
     @overload
-    def param(self, tag: str, key: Sequence) -> pd.Series: ...
+    def param(self, tag: str, key: Sequence) -> tuple[NumericType, ...]: ...
 
     def param(self, tag, key):
         """Retrieve specific parameter(s) for column(s) from a tagged Data object.
@@ -693,7 +757,7 @@ class TaggedData(BaseData):
 
         Returns
         -------
-        Numeric type or pd.Series
+        Numeric type or pl.Series
             Computed parameter value(s).
 
         """
@@ -720,10 +784,10 @@ class TaggedData(BaseData):
 
         """
         if self.is_loaded_from_file():
-            return f"{self.__class__.__name__}({self.datapath}, tag={self._tag})"
-        return f"{self.__class__.__name__}({self.dataframe}, tag={self._tag})"
+            return f"{self.__class__.__name__}({self.datapath}, tag={self._tag_column_name})"
+        return f"{self.__class__.__name__}({self.dataframe}, tag={self._tag_column_name})"
 
 
 # Local Variables:
-# jinx-local-words: "Enum Hashable StringIO csv datadict datadir dataframe datapath dtype ndarray np nrows param sep str usecols" # noqa: E501
+# jinx-local-words: "StringIO csv datadict datadir dataframe datapath dataset dtype ndarray np param polars str"
 # End:
