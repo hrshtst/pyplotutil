@@ -25,6 +25,61 @@ from typing import ClassVar
 
 DEFAULT_LOG_FORMATTER = "%(asctime)s (%(module)s:%(lineno)d) [%(levelname)s]: %(message)s"
 
+CRITICAL = 50
+FATAL = CRITICAL
+ERROR = 40
+WARNING = 30
+WARN = WARNING
+INFO = 20
+DEBUG = 10
+NOTSET = 0
+
+_LEVEL_TO_NAME = {
+    CRITICAL: "CRITICAL",
+    ERROR: "ERROR",
+    WARNING: "WARNING",
+    INFO: "INFO",
+    DEBUG: "DEBUG",
+    NOTSET: "NOTSET",
+}
+_NAME_TO_LEVEL = {
+    "CRITICAL": CRITICAL,
+    "FATAL": FATAL,
+    "ERROR": ERROR,
+    "WARN": WARNING,
+    "WARNING": WARNING,
+    "INFO": INFO,
+    "DEBUG": DEBUG,
+    "NOTSET": NOTSET,
+}
+
+
+def check_level(level: int | str) -> int:
+    """
+    Check validity of given level string and return an integer.
+
+    Parameters
+    ----------
+    level : int or str
+        An integer or a string representing a logging level
+
+    Returns
+    -------
+    int
+        The corresponding logging level as an integer.
+    """
+    if isinstance(level, int):
+        rv = level
+    elif str(level) == level:
+        if level not in _NAME_TO_LEVEL:
+            msg = f"Unknown level: {level}"
+            raise ValueError(msg)
+        rv = _NAME_TO_LEVEL[level]
+    else:
+        msg = f"Level not an integer or a valid string: {level}"
+        raise TypeError(msg)
+    return rv
+
 
 class FakeLogger:
     """
