@@ -21,9 +21,15 @@ import sys
 import tempfile
 import warnings
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, TextIO
 
-DEFAULT_LOG_FORMATTER = "%(asctime)s (%(module)s:%(lineno)d) [%(levelname)s]: %(message)s"
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from pyplotutil._typing import Unknown
+
+DEFAULT_FORMAT = "%(asctime)s (%(module)s:%(lineno)d) [%(levelname)s]: %(message)s"
+_default_formatter = logging.Formatter(DEFAULT_FORMAT)
 
 CRITICAL = 50
 FATAL = CRITICAL
@@ -67,6 +73,7 @@ def check_level(level: int | str) -> int:
     -------
     int
         The corresponding logging level as an integer.
+
     """
     if isinstance(level, int):
         rv = level
@@ -93,55 +100,89 @@ class FakeLogger:
         The logging level currently set.
     _logging_level_map : ClassVar[dict[str, int]]
         A mapping of logging level names to their corresponding integer values.
+
     """
 
-    _console_output: bool
-    _logging_level: int
-    _logging_level_map: ClassVar[dict[str, int]] = {
-        "NOTSET": 0,
-        "DEBUG": 10,
-        "INFO": 20,
-        "WARNING": 30,
-        "ERROR": 40,
-        "CRITICAL": 50,
-    }
+    _level: int
+    _formatter: logging.Formatter
+    _stream: TextIO
+    _disabled: bool
+    terminator: str = "\n"
 
-    def __init__(self, *, disable_console_output: bool = False) -> None:
+    def __init__(self, level: int | str = NOTSET, stream: TextIO | None = None, *, disable: bool = False) -> None:
         """
         Initialize the FakeLogger.
 
         Parameters
         ----------
-        disable_console_output : bool, optional
+        level : int or str, optional
+            The logging level to set, either as an integer or a string (default is WARNING).
+        stream : TextIO, optional
+            The stream in which logging output will be emitted (default is sys.stderr).
+        disable : bool, optional
             Whether to disable console output (default is False).
-        """
-        self._disable_console_output = disable_console_output
-        self._logging_level = logging.WARNING
 
-    def _format(self, msg: str, *args: object) -> str:
         """
-        Format a message string with the provided arguments.
+        self.set_level(level)
+        self._formatter = _default_formatter
+        self._stream = stream if stream is not None else sys.stderr
+        self._disabled = disable
+
+    def set_level(self, level: int | str) -> None:
+        """
+        Set the logging level.
 
         Parameters
         ----------
-        msg : str
-            The message template.
-        *args : object
-            Arguments to format the message with.
+        level : int or str
+            The logging level to set, either as an integer or a string.
 
-        Returns
-        -------
-        str
-            The formatted message.
         """
-        formatted_msg = msg % args
-        if not formatted_msg.endswith("\n"):
-            formatted_msg += "\n"
-        return formatted_msg
+        self._level = check_level(level)
 
-    def log(self, level: int, msg: str, *args: object, stacklevel: int = 1) -> None:
+    def setLevel(self, level: int | str) -> None:  # noqa: N802
         """
-        Log a message at the specified level.
+        Alias for set_level.
+
+        Parameters
+        ----------
+        level : int or str
+            The logging level to set, either as an integer or a string.
+
+        """
+        return self.set_level(level)
+
+    def is_enabled_for(self, level: int) -> bool:
+        """Check if this logger is enabled for a level `level`.
+
+        Parameters
+        ----------
+        level : int
+            The logging level to check if this logger is enabled.
+
+        """
+        if self.disabled:
+            return False
+        return level >= self.level
+
+    def find_caller(self, *, stack_info: bool = False, stacklevel: int = 1) -> tuple[str, int, str, str | None]:
+        """Find the stack frame of the caller including the source file name, line number and function name."""
+        _ = stack_info, stacklevel
+        return "(unknown file)", 0, "(unknown function)", None
+
+    def _log(
+        self,
+        level: int,
+        msg: str,
+        args: tuple[object, ...],
+        *,
+        exc_info: tuple[None, None, None] | None = None,
+        extra: Mapping[str, object] | None = None,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+    ) -> None:
+        """
+        Low-level logging routine.
 
         Parameters
         ----------
@@ -153,21 +194,37 @@ class FakeLogger:
             Arguments to format the message.
         stacklevel : int, optional
             The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        match level:
-            case _ if level >= logging.CRITICAL:
-                self.critical(msg, args, stacklevel=stacklevel)
-            case _ if level >= logging.ERROR:
-                self.error(msg, args, stacklevel=stacklevel)
-            case _ if level >= logging.WARNING:
-                self.warning(msg, args, stacklevel=stacklevel)
-            case _ if level >= logging.INFO:
-                self.info(msg, args, stacklevel=stacklevel)
-            case _:
-                self.debug(msg, args, stacklevel=stacklevel)
 
-    def debug(self, msg: str, *args: object, stacklevel: int = 1) -> None:
+        """
+        fn, lno, func, sinfo = self.find_caller(stack_info=stack_info, stacklevel=stacklevel)
+        _ = extra
+        record = logging.LogRecord("root", level, fn, lno, msg, args, exc_info, func, sinfo)
+        self.handle(record)
+
+    def handle(self, record: logging.LogRecord) -> None:
+        """Handle a record."""
+        self.emit(record)
+
+    def flush(self) -> None:
+        """Ensure logging output has been flushed."""
+        if self._stream and hasattr(self._stream, "flush"):
+            self._stream.flush()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a record formatted by the specified formatter."""
+        msg = self.format(record)
+        self._stream.write(msg + self.terminator)
+        self.flush()
+
+    def set_formatter(self, fmt: logging.Formatter) -> None:
+        """Set the formatter for this fake handler."""
+        self._formatter = fmt
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the specified record."""
+        return self._formatter.format(record)
+
+    def debug(self, msg: str, *args: object, **kwargs: Unknown) -> None:
         """
         Log a debug-level message.
 
@@ -177,16 +234,14 @@ class FakeLogger:
             The debug message.
         *args : object
             Arguments to format the message.
-        stacklevel : int, optional
-            The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        if not self._disable_console_output and self._logging_level <= logging.DEBUG:
-            sys.stderr.write(self._format(msg, *args))
 
-    def info(self, msg: str, *args: object, stacklevel: int = 1) -> None:
         """
-        Log an info-level message.
+        if self.is_enabled_for(DEBUG):
+            self._log(DEBUG, msg, args, **kwargs)
+
+    def info(self, msg: str, *args: object, **kwargs: Unknown) -> None:
+        """
+        Log a info-level message.
 
         Parameters
         ----------
@@ -194,14 +249,12 @@ class FakeLogger:
             The info message.
         *args : object
             Arguments to format the message.
-        stacklevel : int, optional
-            The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        if not self._disable_console_output and self._logging_level <= logging.INFO:
-            sys.stderr.write(self._format(msg, *args))
 
-    def warning(self, msg: str, *args: object, stacklevel: int = 1) -> None:
+        """
+        if self.is_enabled_for(INFO):
+            self._log(INFO, msg, args, **kwargs)
+
+    def warning(self, msg: str, *args: object, **kwargs: Unknown) -> None:
         """
         Log a warning-level message.
 
@@ -211,16 +264,14 @@ class FakeLogger:
             The warning message.
         *args : object
             Arguments to format the message.
-        stacklevel : int, optional
-            The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        if not self._disable_console_output and self._logging_level <= logging.WARNING:
-            sys.stderr.write(self._format(msg, *args))
 
-    def error(self, msg: str, *args: object, stacklevel: int = 1) -> None:
         """
-        Log an error-level message.
+        if self.is_enabled_for(WARNING):
+            self._log(WARNING, msg, args, **kwargs)
+
+    def error(self, msg: str, *args: object, **kwargs: Unknown) -> None:
+        """
+        Log a error-level message.
 
         Parameters
         ----------
@@ -228,14 +279,12 @@ class FakeLogger:
             The error message.
         *args : object
             Arguments to format the message.
-        stacklevel : int, optional
-            The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        if not self._disable_console_output and self._logging_level <= logging.ERROR:
-            sys.stderr.write(self._format(msg, *args))
 
-    def critical(self, msg: str, *args: object, stacklevel: int = 1) -> None:
+        """
+        if self.is_enabled_for(ERROR):
+            self._log(ERROR, msg, args, **kwargs)
+
+    def critical(self, msg: str, *args: object, **kwargs: Unknown) -> None:
         """
         Log a critical-level message.
 
@@ -245,52 +294,45 @@ class FakeLogger:
             The critical message.
         *args : object
             Arguments to format the message.
-        stacklevel : int, optional
-            The stack level for the log (default is 1).
-        """
-        _ = stacklevel
-        if not self._disable_console_output and self._logging_level <= logging.CRITICAL:
-            sys.stderr.write(self._format(msg, *args))
 
-    def suppress_console_output(self) -> None:
         """
-        Disable console output.
-        """
-        self._disable_console_output = False
+        if self.is_enabled_for(CRITICAL):
+            self._log(CRITICAL, msg, args, **kwargs)
 
-    def enable_console_output(self) -> None:
+    def log(self, level: int, msg: str, *args: object, **kwargs: Unknown) -> None:
         """
-        Enable console output.
-        """
-        self._disable_console_output = True
-
-    def set_logging_level(self, logging_level: int | str) -> None:
-        """
-        Set the logging level.
+        Log a message with the integer severity `level`.
 
         Parameters
         ----------
-        logging_level : int or str
-            The logging level to set, either as an integer or a string.
+        level : int
+            The logging severity.
+        msg : str
+            The debug message.
+        *args : object
+            Arguments to format the message.
+
         """
-        if isinstance(logging_level, int):
-            self._logging_level = logging_level
+        if self.is_enabled_for(level):
+            self._log(level, msg, args, **kwargs)
+
+    def toggle(self, *, disabled: bool | None = None) -> bool:
+        """
+        Toggle the output of the fake logger.
+
+        Parameters
+        ----------
+        disabled : bool, optional
+            Set the status of the fake logger.
+        """
+        if disabled is None:
+            self._disabled = not self._disabled
         else:
-            self._logging_level = self._logging_level_map[logging_level]
-
-    def setLevel(self, level: int | str) -> None:  # noqa: N802
-        """
-        Alias for set_logging_level.
-
-        Parameters
-        ----------
-        level : int or str
-            The logging level to set, either as an integer or a string.
-        """
-        self.set_logging_level(level)
+            self._disabled = disabled
+        return self._disabled
 
     @property
-    def logging_level(self) -> int:
+    def level(self) -> int:
         """
         Get the current logging level.
 
@@ -298,11 +340,25 @@ class FakeLogger:
         -------
         int
             The current logging level.
+
         """
-        return self._logging_level
+        return self._level
+
+    @property
+    def disabled(self) -> bool:
+        """
+        Return whether the console output is disabled or not.
+
+        Returns
+        -------
+        bool
+            Whether the console output is disabled or not.
+
+        """
+        return self._disabled
 
 
-def is_running_in_pytest() -> bool:
+def _running_in_pytest() -> bool:
     """
     Check if the code is running inside pytest.
 
@@ -310,11 +366,12 @@ def is_running_in_pytest() -> bool:
     -------
     bool
         True if running in pytest, False otherwise.
+
     """
     return "pytest" in sys.modules
 
 
-_event_logger: logging.Logger | FakeLogger = FakeLogger(disable_console_output=is_running_in_pytest())
+_event_logger: logging.Logger | FakeLogger = FakeLogger(disable=_running_in_pytest())
 
 
 def _get_default_event_log_filename(
@@ -338,6 +395,7 @@ def _get_default_event_log_filename(
     -------
     Path
         The path to the log file.
+
     """
     event_log_filename: Path
     if given_log_filename is None:
@@ -384,9 +442,10 @@ def start_event_logging(
     -------
     logging.Logger
         The configured logger instance.
+
     """
     if fmt is None:
-        fmt = DEFAULT_LOG_FORMATTER
+        fmt = DEFAULT_FORMAT
     if name is None:
         name = __name__
 
@@ -440,8 +499,22 @@ def event_logger() -> logging.Logger | FakeLogger:
     -------
     logging.Logger or FakeLogger
         The global event logger instance.
+
     """
     return _event_logger
+
+
+def evlog() -> logging.Logger | FakeLogger:
+    """
+    Alias for getting the global event logger instance.
+
+    Returns
+    -------
+    logging.Logger or FakeLogger
+        The global event logger instance.
+
+    """
+    return event_logger()
 
 
 def get_logging_level_from_verbose_count(verbose_count: int) -> str:
@@ -457,6 +530,7 @@ def get_logging_level_from_verbose_count(verbose_count: int) -> str:
     -------
     str
         The corresponding logging level as a string.
+
     """
     match verbose_count:
         case 0:
@@ -495,6 +569,7 @@ def start_logging(
     -------
     logging.Logger
         The configured logger instance.
+
     """
     logging_level = get_logging_level_from_verbose_count(verbose_count)
     if not dry_run:
