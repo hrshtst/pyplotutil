@@ -628,7 +628,7 @@ wheels = [
 
 [[package]]
 name = "pyplotutil"
-version = "0.4.1.dev17+g0b9d11b.d20241229"
+version = "0.4.1.dev23+gd8a8a9a.d20250107"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
