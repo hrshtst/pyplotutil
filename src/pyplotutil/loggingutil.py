@@ -41,15 +41,18 @@ Notes
 
 from __future__ import annotations
 
+import io
 import logging
 import sys
 import tempfile
+import traceback
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from types import FrameType
 
     from pyplotutil._typing import Unknown
 
@@ -83,6 +86,27 @@ _NAME_TO_LEVEL = {
     "DEBUG": DEBUG,
     "NOTSET": NOTSET,
 }
+
+
+class _Error(Exception):
+    pass
+
+
+if hasattr(sys, "_getframe"):
+
+    def currentframe() -> FrameType | None:
+        """Return the frame object for the caller's stack frame."""
+        return sys._getframe(1)  # noqa: SLF001
+else:
+
+    def currentframe() -> FrameType | None:
+        """Return the frame object for the caller's stack frame."""
+        try:
+            raise _Error  # noqa: TRY301
+        except _Error as exc:
+            if exc.__traceback__ is not None:
+                return exc.__traceback__.tb_frame.f_back
+        return None
 
 
 def check_level(level: int | str) -> int:
@@ -223,8 +247,25 @@ class FakeLogger:
             (filename, line number, function name, stack info)
 
         """
-        _ = stack_info, stacklevel
-        return "(unknown file)", 0, "(unknown function)", None
+        f = currentframe()
+        if f is None:
+            return "(unknown file)", 0, "(unknown function)", None
+        while stacklevel > 0:
+            next_f = f.f_back
+            if next_f is None:
+                break
+            f = next_f
+            stacklevel -= 1
+        co = f.f_code
+        sinfo = None
+        if stack_info:
+            with io.StringIO() as sio:
+                sio.write("Stack (most recent call last):\n")
+                traceback.print_stack(f, file=sio)
+                sinfo = sio.getvalue()
+                if sinfo[-1] == "\n":
+                    sinfo = sinfo[:-1]
+        return co.co_filename, f.f_lineno, co.co_name, sinfo
 
     def _log(
         self,
