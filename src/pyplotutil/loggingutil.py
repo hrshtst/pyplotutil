@@ -661,7 +661,7 @@ def get_logging_level_from_verbose_count(verbose_count: int) -> str:
 
 def start_logging(
     argv: list[str],
-    output_dir: Path,
+    output_dir: str | Path,
     name: str,
     verbose_count: int,
     *,
@@ -703,5 +703,5 @@ def start_logging(
     """
     logging_level = get_logging_level_from_verbose_count(verbose_count)
     if not dry_run:
-        output_dir.mkdir(parents=True, exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
     return start_event_logging(argv, output_dir, name=name, logging_level=logging_level)
