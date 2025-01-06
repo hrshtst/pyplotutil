@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from pyplotutil._typing import FilePath, NoDefault, no_default
 from pyplotutil.datautil import Data
+from pyplotutil.loggingutil import evlog
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -15,83 +17,102 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 
-def savefig(
-    fig: Figure,
-    data_file_path: Path,
-    ext_list: list[str],
-    *,
-    dpi: float | str = "figure",
-    separate_dir: bool = True,
-) -> list[Path]:
-    saved_figpath: list[Path] = []
-    for ext in ext_list:
-        e = ext
-        if not e.startswith("."):
-            e = f".{e}"
-        if data_file_path.suffix.startswith(".") and data_file_path.suffix[1].isdigit():
-            # When data_file_path.suffix starts with a digit it's not a suffix.
-            # >>> Path('awesome_ratio-2.5').with_suffix('.svg')
-            # 'awesome_ratio-2.svg'  # this is wrong filename
-            data_file_path = data_file_path.with_name(data_file_path.name + ".x")
-        figpath = data_file_path.with_suffix(e)
-        if separate_dir:
-            # Separate saving directories across extensions.
-            figpath = figpath.parent / e[1:] / figpath.name
-            figpath.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(figpath, dpi=dpi, bbox_inches="tight")
-        saved_figpath.append(figpath)
-        msg = f"Figure saved: {figpath}"
-        event_logger().info(msg)
-    return saved_figpath
+FilePathT = TypeVar("FilePathT", str, Path)
 
 
-FILENAME_T = TypeVar("FILENAME_T", str, Path)
-
-
-def _compatible_filename(filename: FILENAME_T) -> FILENAME_T:
-    table = {":": "", " ": "_", "(": "", ")": "", "+": "x"}
+def compatible_filename(filename: FilePathT) -> FilePathT:
+    table = {":": "", " ": "_", "(": "", ")": "", "+": "x", "=": "-"}
     compat_filename = str(filename).translate(str.maketrans(table))  # type: ignore[arg-type]
-    event_logger().debug("Making filename compatible to file system:")
-    event_logger().debug("       given filename: %s", filename)
-    event_logger().debug("  compatible filename: %s", compat_filename)
+    if compat_filename != str(filename):
+        evlog().debug("Filename has been converted to compatible one.")
+        evlog().debug("      given filename: %s", filename)
+        evlog().debug("  converted filename: %s", compat_filename)
     return type(filename)(compat_filename)
+
+
+def make_figure_paths(
+    output_direcotry: FilePath,
+    basename: str,
+    extensions: str | Iterable[str],
+    *,
+    separate_dir_by_main_module: bool | str,
+    separate_dir_by_ext: bool,
+) -> list[Path]:
+    if isinstance(extensions, str):
+        extensions = [extensions]
+    # Make a generator that ensures each extension starts with '.', and remove duplicates.
+    extensions = {x if x.startswith(".") else f".{x}" for x in extensions}
+
+    main_module_name = None
+    if isinstance(separate_dir_by_main_module, str):
+        main_module_name = separate_dir_by_main_module
+    elif separate_dir_by_main_module:
+        try:
+            import __main__
+
+            main_module_name = Path(__main__.__file__).stem
+        except ImportError:
+            main_module_name = None
+
+    built_path = Path(output_direcotry)
+    if main_module_name:
+        built_path /= main_module_name
+    built_path /= basename
+    if built_path.suffix.startswith(".") and built_path.suffix[1].isdigit():
+        # When data_file_path.suffix starts with a digit it's not a suffix.
+        # >>> Path('awesome_ratio-2.5').with_suffix('.svg')
+        # 'awesome_ratio-2.svg'  # this is wrong filename
+        built_path = built_path.with_name(built_path.name + ".x")
+
+    figure_paths: list[Path] = []
+    for ext in extensions:
+        figure_path = built_path
+        if separate_dir_by_ext:
+            figure_path = built_path.parent / ext[1:] / built_path.name
+        figure_paths.append(compatible_filename(figure_path.with_suffix(ext)))
+    return figure_paths
 
 
 def save_figure(
     fig: Figure,
-    save_dir_path: Path,
+    output_directory: FilePath,
     basename: str,
-    ext_list: list[str] | None,
+    extensions: str | Iterable[str] | None,
     *,
-    loaded_from: str | None | NoDefault = no_default,
-    dpi: float | str = "figure",
+    separate_dir_by_main_module: bool | str = False,
+    separate_dir_by_ext: bool = False,
+    make_directories: bool = True,
+    dpi: float | Literal["figure"] = "figure",
+    bbox_inches: Literal["tight"] | None = "tight",
+    pad_inches: float | Literal["layout"] = 0.1,
 ) -> list[Path]:
-    if save_dir_path is None:
-        msg = f"'None' is not allowed for directory path: {save_dir_path}, {type(save_dir_path)}"
+    if output_directory is None:
+        msg = f"'None' is not allowed for directory path: {output_directory}, {type(output_directory)}"
+        evlog().critical(msg)
         raise ValueError(msg)
 
-    if loaded_from is no_default:
-        try:
-            import __main__
+    if extensions is None:
+        evlog().warning("Nothing saved.")
+        evlog().debug("Figures have not been saved since no extension is provided.")
+        return []
 
-            loaded_from = Path(__main__.__file__).stem
-        except ImportError:
-            loaded_from = None
+    figure_paths = make_figure_paths(
+        output_directory,
+        basename,
+        extensions,
+        separate_dir_by_main_module=separate_dir_by_main_module,
+        separate_dir_by_ext=separate_dir_by_ext,
+    )
+    if make_directories:
+        for directory_path in {p.parent for p in figure_paths}:
+            directory_path.mkdir(parents=True, exist_ok=True)
+            evlog().debug("Directory created: %s", str(directory_path))
 
-    built_filename = save_dir_path
-    if loaded_from:
-        built_filename /= loaded_from
-    built_filename /= basename
-    built_filename = _compatible_filename(built_filename)
+    for figure_path in figure_paths:
+        fig.savefig(figure_path, dpi=dpi, bbox_inches=bbox_inches, pad_inches=pad_inches)
+        evlog().info("Figure saved: %s", str(figure_path))
 
-    fig.tight_layout()
-    saved_figures: list[Path] = []
-    if ext_list is not None:
-        saved_figures = savefig(fig, built_filename, ext_list, dpi=dpi)
-    else:
-        event_logger().warning("Nothing saved.")
-        event_logger().debug("Figures have not been saved since no extension is provided.")
-    return saved_figures
+    return figure_paths
 
 
 def load_dataset(dataset_dir_path: Path, pattern: str = "**.csv") -> list[Data]:
@@ -104,10 +125,6 @@ def load_dataset(dataset_dir_path: Path, pattern: str = "**.csv") -> list[Data]:
         msg = f"No CSV files found: {dataset_dir_path}"
         raise RuntimeError(msg)
     return dataset
-
-
-def load_latest_dataset(dataset_dir_path: Path, pattern: str = "**.csv") -> list[Data]:
-    return load_dataset(find_latest_data_dir_path(dataset_dir_path, force_find_by_pattern=True), pattern)
 
 
 def pickup_datapath(path_list: list[Path], pickup_list: list[int | str]) -> list[Path]:
