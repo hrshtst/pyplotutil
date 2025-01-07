@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from pyplotutil._typing import FilePath
 from pyplotutil.plotutil import compatible_filename, make_figure_paths
+
+if TYPE_CHECKING:
+    from pyplotutil._typing import FilePath
 
 
 @pytest.mark.parametrize(

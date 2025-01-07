@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pyplotutil._typing import FilePath, NoDefault, no_default
-from pyplotutil.datautil import Data
 from pyplotutil.loggingutil import evlog
 
 if TYPE_CHECKING:
@@ -15,6 +13,10 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
+    from matplotlib.typing import ColorType
+
+    from pyplotutil._typing import FilePath
 
 
 FilePathT = TypeVar("FilePathT", str, Path)
@@ -115,48 +117,7 @@ def save_figure(
     return figure_paths
 
 
-def load_dataset(dataset_dir_path: Path, pattern: str = "**.csv") -> list[Data]:
-    if not dataset_dir_path.exists():
-        msg = f"Directory does not exist: {dataset_dir_path}"
-        raise ValueError(msg)
-    csv_files = dataset_dir_path.glob(pattern)
-    dataset = [Data(csv) for csv in csv_files]
-    if len(dataset) == 0:
-        msg = f"No CSV files found: {dataset_dir_path}"
-        raise RuntimeError(msg)
-    return dataset
-
-
-def pickup_datapath(path_list: list[Path], pickup_list: list[int | str]) -> list[Path]:
-    cherries = []
-    for i in pickup_list:
-        if isinstance(i, str):
-            if "-" in i:
-                begin, end = map(int, i.split("-"))
-                cherries.extend(path_list[begin : end + 1])
-            else:
-                cherries.append(path_list[int(i)])
-        else:
-            cherries.append(path_list[i])
-    return cherries
-
-
-def find_minimum_length(dataset: list[Data]) -> int:
-    # find minimum length among data files in dataset
-    n = 2**63 - 1
-    for data in dataset:
-        n = min(n, len(data))
-    return n
-
-
-def extract_all_values(dataset: list[Data], key: str) -> np.ndarray:
-    n = find_minimum_length(dataset)
-    data_array = np.vstack([getattr(data, key)[:n] for data in dataset])
-    assert data_array.shape == (len(dataset), n)
-    return data_array
-
-
-def extract_common_parts(*paths: str | Path) -> Path:
+def extract_common_path(*paths: str | Path) -> Path:
     # Convert paths to Path objects
     path_objects = [Path(path) for path in paths]
 
@@ -182,12 +143,6 @@ def extract_common_parts(*paths: str | Path) -> Path:
 
 def get_tlim_mask(t: np.ndarray, tlim: tuple[float, float] | None) -> np.ndarray:
     return np.full(t.shape, fill_value=True) if tlim is None else (t >= tlim[0]) & (t <= tlim[1])
-
-
-def mask_data(tlim: tuple[float, float] | None, t: np.ndarray, data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    assert len(t) == len(data)
-    mask = get_tlim_mask(t, tlim)
-    return t[mask], data[mask]
 
 
 def plot_multi_timeseries(
@@ -247,6 +202,53 @@ def calculate_mean_err(
 
     msg = f"unrecognized error type: {err_type}"
     raise ValueError(msg)
+
+
+def plot_mean_err(
+    ax: Axes,
+    t: np.ndarray,
+    y: np.ndarray,
+    err_type: str | None,
+    tlim: tuple[float, float] | None,
+    fmt: str,
+    capsize: int,
+    label: str | None,
+) -> Line2D:
+    mask = get_tlim_mask(t, tlim)
+    if err_type is None or err_type == "none":
+        mean, _, _ = calculate_mean_err(y)
+        lines = ax.plot(t[mask], mean[mask], fmt, label=label)
+    else:
+        mean, err1, err2 = calculate_mean_err(y, err_type=err_type)
+        if err2 is None:
+            eb = ax.errorbar(t[mask], mean[mask], yerr=err1[mask], capsize=capsize, fmt=fmt, label=label)
+        else:
+            eb = ax.errorbar(t[mask], mean[mask], yerr=(err1[mask], err2[mask]), capsize=capsize, fmt=fmt, label=label)
+        lines = eb.lines  # type: ignore[assignment]
+    return lines[0]
+
+
+def fill_between_err(
+    ax: Axes,
+    t: np.ndarray,
+    y: np.ndarray,
+    err_type: str | None,
+    tlim: tuple[float, float] | None,
+    color: ColorType,
+    alpha: float,
+) -> Axes:
+    if err_type is None:
+        msg = "`err_type` for `fill_between_err` must not be None."
+        raise TypeError(msg)
+
+    mask = get_tlim_mask(t, tlim)
+    mean, err1, err2 = calculate_mean_err(y, err_type=err_type)
+    # Note that fill_between always goes behind lines.
+    if err2 is None:
+        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err1[mask], facecolor=color, alpha=alpha)
+    else:
+        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err2[mask], facecolor=color, alpha=alpha)
+    return ax
 
 
 # Local Variables:
