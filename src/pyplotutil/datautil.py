@@ -126,7 +126,7 @@ class BaseData:
                 ),
             )
             if isinstance(data_source, FilePath):
-                self._set_datapath(data_source)
+                self.set_datapath(data_source)
         else:
             msg = f"Unsupported data source type: {type(data_source)}"
             raise TypeError(msg)
@@ -281,7 +281,7 @@ class BaseData:
             return False
         return True
 
-    def _set_datapath(self, datapath: str | Path) -> None:
+    def set_datapath(self, datapath: str | Path) -> None:
         """Set the path to the data file.
 
         Parameters
