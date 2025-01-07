@@ -36,11 +36,14 @@ and other applications requiring structured data handling.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Mapping, Sequence
+from collections import OrderedDict
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from functools import cached_property, partial
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO, overload
 
+import numpy as np
 import polars as pl
 from polars.exceptions import ColumnNotFoundError
 
@@ -58,8 +61,6 @@ from pyplotutil._typing import (
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView, Iterator, KeysView
-
-    import numpy as np
 
     from pyplotutil._typing import DataSourceType
 
@@ -841,6 +842,143 @@ class TaggedData(BaseData):
         if self.is_loaded_from_file():
             return f"{self.__class__.__name__}({self.datapath}, tag={self._tag_column_name})"
         return f"{self.__class__.__name__}({self.dataframe}, tag={self._tag_column_name})"
+
+
+class Dataset:
+    _dataset: list[Data]
+
+    def __init__(
+        self,
+        source_paths: FilePath | Iterable[FilePath],
+        *,
+        separator: str = ",",
+        has_header: bool = True,
+        columns: Sequence[int] | Sequence[str] | None = None,
+        names: Sequence[str] | None = None,
+        n_rows: int | None = None,
+        comment: str | None = None,
+        glob_pattern: str = "**/*.csv",
+        n_pickup_per_directory: int | None = None,
+    ) -> None:
+        self._dataset = Dataset.load_dataset(
+            source_paths,
+            separator=separator,
+            has_header=has_header,
+            columns=columns,
+            names=names,
+            n_rows=n_rows,
+            comment=comment,
+            glob_pattern=glob_pattern,
+            n_pickup_per_directory=n_pickup_per_directory,
+        )
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+    def __iter__(self) -> Iterator[Data]:
+        return iter(self._dataset)
+
+    @overload
+    def __gettiem__(self, index: int) -> Data: ...
+
+    @overload
+    def __gettiem__(self, index: slice) -> list[Data]: ...
+
+    def __gettiem__(self, index):
+        return self._dataset[index]
+
+    @property
+    def datapaths(self) -> list[Path]:
+        return [data.datapath for data in self]
+
+    @property
+    def datadirs(self) -> list[Path]:
+        return list(OrderedDict.fromkeys(self.datapaths))
+
+    @property
+    def dataset(self) -> list[Data]:
+        return self._dataset
+
+    @staticmethod
+    def load_dataset(
+        source_paths: FilePath | Iterable[FilePath],
+        *,
+        separator: str = ",",
+        has_header: bool = True,
+        columns: Sequence[int] | Sequence[str] | None = None,
+        names: Sequence[str] | None = None,
+        n_rows: int | None = None,
+        comment: str | None = None,
+        glob_pattern: str = "**/*.csv",
+        n_pickup_per_directory: int | None = None,
+    ) -> list[Data]:
+        if isinstance(source_paths, FilePath):
+            source_paths = [source_paths]
+
+        data_loader: Callable[[Path], Data] = partial(
+            Data,
+            separator=separator,
+            has_header=has_header,
+            columns=columns,
+            names=names,
+            n_rows=n_rows,
+            comment=comment,
+        )
+
+        dataset: list[Data] = []
+        for source_path in source_paths:
+            path = Path(source_path)
+            if not path.exists():
+                msg = f"{_ERR_MSG_PATH_NOT_EXIST}: {path!s}"
+                raise ValueError(msg)
+            if path.is_dir():
+                found_files = sorted(path.glob(glob_pattern))
+                if n_pickup_per_directory is not None:
+                    found_files = found_files[:n_pickup_per_directory]
+                if len(found_files) == 0:
+                    msg = f"{_WARN_MSG_NO_FILES_FOUND}: {path!s}, {glob_pattern}"
+                    warnings.warn(msg, UserWarning, stacklevel=2)
+                dataset.extend(data_loader(x) for x in found_files)
+            else:
+                dataset.append(data_loader(path))
+        return dataset
+
+    @cached_property
+    def min_n_rows(self) -> int:
+        return min(map(len, self._dataset))
+
+    def get_columns(self, name: str, *, aligned: bool = True) -> list[pl.Series]:
+        if not aligned:
+            return [data.get_column(name) for data in self]
+        n = self.min_n_rows
+        return [data.get_column(name)[:n] for data in self]
+
+    def get_columns_as_array(self, name: str) -> np.ndarray:
+        return np.asarray(self.get_columns(name, aligned=True))
+
+    def get_axis_data(
+        self,
+        x_axis_name: str,
+        y_data_name: str,
+        *,
+        x_axis_index: int = 0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        y = self.get_columns_as_array(y_data_name)
+        n = y.shape[1]
+        x = self._dataset[x_axis_index].get_column(x_axis_name).to_numpy()[:n]
+        return x, y
+
+    def get_timeseries(
+        self,
+        name: str,
+        t_shift: float = 0.0,
+        *,
+        t_axis_name: str = "t",
+        t_axis_index: int = 0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        t, y = self.get_axis_data(t_axis_name, name, x_axis_index=t_axis_index)
+        t = t - t_shift
+        return t, y
 
 
 # Local Variables:
