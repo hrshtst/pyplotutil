@@ -471,6 +471,84 @@ def test_data_param_list(default_data: Data, cols: list[str], expected: list[flo
     assert default_data.param(cols) == expected
 
 
+def test_data_clone(default_data: Data) -> None:
+    cloned_data = default_data.clone()
+    assert_frame_equal(cloned_data.df, default_data.df)
+    assert not cloned_data.is_loaded_from_file()
+
+
+def test_data_clone_keep_datapath(default_data: Data) -> None:
+    cloned_data = default_data.clone(keep_datapath=True)
+    assert_frame_equal(cloned_data.df, default_data.df)
+    assert cloned_data.datapath == default_data.datapath
+
+
+def test_data_clone_keep_datapath_warn() -> None:
+    data = Data(StringIO(TEST_TEXT))
+    msg = "clone: Source Data object may not be loaded from a file."
+    with pytest.warns(UserWarning, match=msg):
+        cloned_data = data.clone(keep_datapath=True)
+    assert_frame_equal(cloned_data.df, data.df)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        ("A", "B", "C", "D", "E"),
+        ["_a", "_b", "_c", "_d", "_e"],
+    ],
+)
+def test_data_clone_rename_sequence(default_data: Data, mapping: Sequence[str]) -> None:
+    cloned_data = default_data.clone(rename_mapping=mapping)
+    expected = default_data.df.rename(dict(zip(default_data.columns, mapping, strict=True)))
+    assert_frame_equal(cloned_data.df, expected)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"a": "A", "b": "B", "c": "C", "d": "D", "e": "E"},
+        {"a": "A", "b": "B"},
+    ],
+)
+def test_data_clone_rename_mapping(default_data: Data, mapping: dict[str, str]) -> None:
+    cloned_data = default_data.clone(rename_mapping=mapping)
+    expected = default_data.df.rename(mapping)
+    assert_frame_equal(cloned_data.df, expected)
+
+
+@pytest.mark.parametrize(
+    ("key", "start", "end", "rename_mapping", "keep_datapath", "expected"),
+    [
+        (("a", "c"), None, None, None, False, pl.DataFrame({"a": [1, 2, 3, 4], "c": [10.0, 20.0, 30.0, 40.0]})),
+        (("c", "a"), 2, None, None, True, pl.DataFrame({"c": [30.0, 40.0], "a": [3, 4]})),
+        (("a", "e"), None, 2, None, False, pl.DataFrame({"a": [1, 2], "e": [100, 200]})),
+        (["a"], 1, 3, None, False, pl.DataFrame({"a": [2, 3]})),
+        (["a", "c"], None, None, ["A", "C"], True, pl.DataFrame({"A": [1, 2, 3, 4], "C": [10.0, 20.0, 30.0, 40.0]})),
+        (["a", "e"], 0, 3, {"a": "apple"}, True, pl.DataFrame({"apple": [1, 2, 3], "e": [100, 200, 300]})),
+    ],
+)
+def test_data_subset(
+    default_data: Data,
+    *,
+    key: Sequence[str],
+    start: int | None,
+    end: int | None,
+    rename_mapping: dict[str, str] | Sequence[str],
+    keep_datapath: bool,
+    expected: pl.DataFrame,
+) -> None:
+    subset_data = default_data.subset(
+        key,
+        start=start,
+        end=end,
+        rename_mapping=rename_mapping,
+        keep_datapath=keep_datapath,
+    )
+    assert_frame_equal(subset_data.df, expected)
+    assert subset_data.is_loaded_from_file() is keep_datapath
+
+
 def test_tagged_data_init_with_dataframe(tagged_dataframe: pl.DataFrame) -> None:
     """Test initialization of `TaggedData` from a polars DataFrame."""
     tagged_data = TaggedData(tagged_dataframe)

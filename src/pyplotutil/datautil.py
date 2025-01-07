@@ -35,6 +35,8 @@ and other applications requiring structured data handling.
 
 from __future__ import annotations
 
+import warnings
+from collections.abc import Mapping, Sequence
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO, overload
@@ -55,11 +57,17 @@ from pyplotutil._typing import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import ItemsView, Iterator, KeysView, Sequence
+    from collections.abc import ItemsView, Iterator, KeysView
 
     import numpy as np
 
     from pyplotutil._typing import DataSourceType
+
+
+_ERR_MSG_NOT_LOADED_FROM_FILE = "Data object may not be loaded from a file."
+_ERR_MSG_PATH_NOT_EXIST = "Source path does not exist"
+_WARN_MSG_CLONE_NOT_LOADED_FROM_FILE = "clone: Source Data object may not be loaded from a file."
+_WARN_MSG_NO_FILES_FOUND = "No files found with the following glob pattern"
 
 
 class BaseData:
@@ -305,7 +313,7 @@ class BaseData:
         try:
             return self._datapath
         except AttributeError as e:
-            msg = "Data object may not be loaded from a file."
+            msg = _ERR_MSG_NOT_LOADED_FROM_FILE
             raise AttributeError(msg) from e
 
     @property
@@ -560,6 +568,53 @@ class Data(BaseData):
         if isinstance(subset, pl.Series):
             return subset[0]
         return subset.row(0)
+
+    def _copy_datapath_if_loaded_from_file(self, dest_data: Data) -> Data:
+        try:
+            dest_data.set_datapath(self.datapath)
+        except AttributeError as e:
+            if _ERR_MSG_NOT_LOADED_FROM_FILE in str(e):
+                msg = _WARN_MSG_CLONE_NOT_LOADED_FROM_FILE
+                warnings.warn(msg, UserWarning, stacklevel=2)
+            else:
+                raise AttributeError(str(e)) from e
+        return dest_data
+
+    def clone(
+        self,
+        *,
+        rename_mapping: dict[str, str] | Sequence[str] | None = None,
+        keep_datapath: bool = False,
+    ) -> Data:
+        if isinstance(rename_mapping, Mapping):
+            cloned_df = self.df.rename(rename_mapping)
+        elif isinstance(rename_mapping, Sequence):
+            cloned_df = self.df.rename(dict(zip(self.df.columns, rename_mapping, strict=True)))
+        else:
+            cloned_df = self.df.clone()
+        cloned_data = Data(cloned_df)
+        if keep_datapath:
+            cloned_data = self._copy_datapath_if_loaded_from_file(cloned_data)
+        return cloned_data
+
+    def subset(
+        self,
+        key: Sequence[str],
+        *,
+        start: int | None = None,
+        end: int | None = None,
+        rename_mapping: dict[str, str] | Sequence[str] | None = None,
+        keep_datapath: bool = False,
+    ) -> Data:
+        subset_df = self[start:end, key]
+        if isinstance(rename_mapping, Mapping):
+            subset_df = subset_df.rename(rename_mapping)
+        elif isinstance(rename_mapping, Sequence):
+            subset_df = subset_df.rename(dict(zip(subset_df.columns, rename_mapping, strict=True)))
+        subset_data = Data(subset_df)
+        if keep_datapath:
+            subset_data = self._copy_datapath_if_loaded_from_file(subset_data)
+        return subset_data
 
 
 class TaggedData(BaseData):
