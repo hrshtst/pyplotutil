@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from matplotlib.lines import Line2D
     from matplotlib.typing import ColorType
 
-    from pyplotutil._typing import FilePath
+    from pyplotutil._typing import FilePath, Unknown
 
 
 FilePathT = TypeVar("FilePathT", str, Path)
@@ -149,25 +149,6 @@ def get_tlim_mask(t: np.ndarray, tlim: tuple[float, float] | None) -> np.ndarray
     return np.full(t.shape, fill_value=True) if tlim is None else (t >= tlim[0]) & (t <= tlim[1])
 
 
-def plot_multi_timeseries(
-    ax: Axes,
-    t: np.ndarray,
-    data_array: np.ndarray,
-    lw: int,
-    c: str | None = None,
-    labels: Iterable[str] | None = None,
-    cmap_name: str = "tab10",
-) -> None:
-    data_array = np.atleast_2d(data_array)
-    cmap = plt.get_cmap(cmap_name)
-    if labels is None:
-        labels = ["" for _ in range(len(data_array))]
-    for i, (data, label) in enumerate(zip(data_array, labels, strict=True)):
-        color = cmap(i) if c is None else c
-        n = min(len(t), len(data))
-        ax.plot(t[:n], data[:n], label=str(label), lw=lw, c=color)
-
-
 def calculate_mean_err(
     data_array: np.ndarray,
     err_type: str = "std",
@@ -208,50 +189,121 @@ def calculate_mean_err(
     raise ValueError(msg)
 
 
+def plot_multi_timeseries(
+    ax: Axes,
+    t: np.ndarray,
+    y_arr: np.ndarray,
+    *,
+    tlim: tuple[float, float] | None,
+    lw: int | None,
+    color: ColorType | None = None,
+    fmt: str | None = None,
+    labels: str | Iterable[str] | None = None,
+    cmap_name: str = "tab10",
+) -> list[Line2D]:
+    mask = get_tlim_mask(t, tlim)
+    y_arr = np.atleast_2d(y_arr)
+    cmap = plt.get_cmap(cmap_name)
+    if labels is None:
+        labels = [f"{i}" for i in range(len(y_arr))]
+    elif isinstance(labels, str):
+        labels = [labels] if len(y_arr) == 1 else [f"{labels}_{i}" for i in range(len(y_arr))]
+
+    kwargs: dict[str, Unknown] = {}
+    if lw is not None:
+        kwargs["lw"] = lw
+    if color is not None:
+        kwargs["c"] = color
+
+    t_mask = t[mask]
+    lines: list[Line2D] = []
+    for i, (y, label) in enumerate(zip(y_arr, labels, strict=True)):
+        kwargs["label"] = str(label)
+        if color is None:
+            kwargs["c"] = cmap(i)
+
+        if fmt is None:  # noqa: SIM108
+            _lines = ax.plot(t_mask, y[mask], **kwargs)
+        else:
+            _lines = ax.plot(t_mask, y[mask], fmt, **kwargs)
+        lines.extend(_lines)
+    return lines
+
+
 def plot_mean_err(
     ax: Axes,
     t: np.ndarray,
-    y: np.ndarray,
+    y_arr: np.ndarray,
     err_type: str | None,
+    *,
     tlim: tuple[float, float] | None,
-    fmt: str,
-    capsize: int,
-    label: str | None,
+    lw: int | None,
+    capsize: int | None,
+    color: ColorType | None = None,
+    fmt: str | None = None,
+    label: str | None = None,
 ) -> Line2D:
     mask = get_tlim_mask(t, tlim)
+    y_arr = np.atleast_2d(y_arr)
+
+    kwargs: dict[str, Unknown] = {}
+    if lw is not None:
+        kwargs["lw"] = lw
+    if capsize is not None:
+        kwargs["capsize"] = capsize
+    if color is not None:
+        kwargs["c"] = color
+    if fmt is not None:
+        kwargs["fmt"] = fmt
+    kwargs["label"] = label
+
     if err_type is None or err_type == "none":
-        mean, _, _ = calculate_mean_err(y)
-        lines = ax.plot(t[mask], mean[mask], fmt, label=label)
+        mean, _, _ = calculate_mean_err(y_arr)
+        lines = plot_multi_timeseries(ax, t, mean, tlim=tlim, lw=lw, color=color, fmt=fmt, labels=label)
     else:
-        mean, err1, err2 = calculate_mean_err(y, err_type=err_type)
+        mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type)
         if err2 is None:
-            eb = ax.errorbar(t[mask], mean[mask], yerr=err1[mask], capsize=capsize, fmt=fmt, label=label)
+            eb = ax.errorbar(t[mask], mean[mask], yerr=err1[mask], **kwargs)
         else:
-            eb = ax.errorbar(t[mask], mean[mask], yerr=(err1[mask], err2[mask]), capsize=capsize, fmt=fmt, label=label)
-        lines = eb.lines  # type: ignore[assignment]
+            eb = ax.errorbar(t[mask], mean[mask], yerr=(err1[mask], err2[mask]), **kwargs)
+        lines = [eb.lines[0]]
     return lines[0]
 
 
 def fill_between_err(
     ax: Axes,
     t: np.ndarray,
-    y: np.ndarray,
+    y_arr: np.ndarray,
     err_type: str | None,
+    *,
     tlim: tuple[float, float] | None,
-    color: ColorType,
-    alpha: float,
+    color: ColorType | None,
+    alpha: float | None,
+    interpolation: bool = False,
+    suppress_exception: bool = False,
 ) -> Axes:
-    if err_type is None:
+    if err_type is None or err_type == "none":
+        if suppress_exception:
+            return ax
         msg = "`err_type` for `fill_between_err` must not be None."
-        raise TypeError(msg)
+        raise ValueError(msg)
 
     mask = get_tlim_mask(t, tlim)
-    mean, err1, err2 = calculate_mean_err(y, err_type=err_type)
+    y_arr = np.atleast_2d(y_arr)
+
+    kwargs: dict[str, Unknown] = {}
+    if color is not None:
+        kwargs["facecolor"] = color
+    if alpha is not None:
+        kwargs["alpha"] = alpha
+    kwargs["interpolation"] = interpolation
+
+    mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type)
     # Note that fill_between always goes behind lines.
     if err2 is None:
-        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err1[mask], facecolor=color, alpha=alpha)
+        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err1[mask], **kwargs)
     else:
-        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err2[mask], facecolor=color, alpha=alpha)
+        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err2[mask], **kwargs)
     return ax
 
 
