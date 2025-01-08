@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyplotutil.plotutil import compatible_filename, make_figure_paths
+from pyplotutil.plotutil import compatible_filename, extract_common_path, make_figure_paths
+from tests.test_datautil import DATA_DIR_PATH
 
 if TYPE_CHECKING:
     from pyplotutil._typing import FilePath
@@ -239,3 +240,21 @@ def test_make_figure_paths(
         separate_dir_by_ext=separate_dir_by_ext,
     )
     assert set(figure_paths) == {Path(e) for e in expected}
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    [
+        (["./a/b/c/d.pdf", "./a/b/c/e.pdf"], Path("./a/b/c")),
+        (["./a/b/c/d.pdf", "a/b/f/g.pdf", "./a/b/h/i.pdf"], Path("a/b")),
+        (["a/b/c/d.pdf", "a/e/f/g.pdf", "./a/h/i.pdf"], Path("a")),
+        (["a/b.pdf", "c/d.pdf", "e/f.pdf"], Path()),
+        (["/a/b/c/d.pdf", "/a/b/f/g.pdf"], Path("/a/b")),
+        (["/a/b.pdf", "/c/d.pdf", "/e/f.pdf"], Path("/")),
+        ([Path.cwd() / "a/b.pdf", "a/c.pdf"], Path.cwd() / "a"),
+        ([DATA_DIR_PATH / "test.csv"], DATA_DIR_PATH),
+    ],
+)
+def test_extract_common_path(paths: list[str | Path], expected: Path) -> None:
+    result = extract_common_path(*paths)
+    assert result == expected

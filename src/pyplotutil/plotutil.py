@@ -118,8 +118,13 @@ def save_figure(
 
 
 def extract_common_path(*paths: str | Path) -> Path:
-    # Convert paths to Path objects
-    path_objects = [Path(path) for path in paths]
+    are_absolute = [x.is_absolute() for x in map(Path, paths)]
+    if not all(are_absolute) and any(are_absolute):
+        # When absolute and relative paths are mixed, convert them to absolute ones.
+        path_objects = [Path(path).resolve() for path in paths]
+    else:
+        # Convert paths to Path objects
+        path_objects = [Path(path) for path in paths]
 
     # Find the shortest path
     shortest_path = min(path_objects, key=lambda p: len(p.parts))
@@ -128,17 +133,16 @@ def extract_common_path(*paths: str | Path) -> Path:
     common_parts = []
     for i, part in enumerate(shortest_path.parts):
         if all(part in path.parts[: i + 1] for path in path_objects):
-            if part == "/":
-                common_parts.append("")
-            else:
-                common_parts.append(part)
+            common_parts.append(part)
         else:
             break
 
-    # Join common parts back into a path string
-    common_path = "/".join(common_parts)
-
-    return Path(common_path)
+    # Join common parts back into a path object
+    common_path = Path(*common_parts)
+    if common_path.is_file():
+        # When common path exists and it is a file, its parent directory is returned.
+        common_path = common_path.parent
+    return common_path
 
 
 def get_tlim_mask(t: np.ndarray, tlim: tuple[float, float] | None) -> np.ndarray:
