@@ -2,7 +2,7 @@
 
 This module provides classes for managing and manipulating tabular data, with functionalities to
 load data from various sources, group data structure by specified tags, and access columns or rows
-with intuitive syntax. The primary classes, `Data`, and `TaggedData`, facilitate working with
+with intuitive syntax. The primary classes, `Data`, `TaggedData`, and `Dataset`, facilitate working with
 tabular data in polars DataFrame while allowing access to specific features like data grouping,
 dynamic attribute setting, and easy retrieval of parameter values.
 
@@ -17,6 +17,9 @@ Data : Extends BaseData to represent a single tabular data.
 TaggedData : Extends BaseData to handle grouped data based on a specified tag column.
     Allows grouping data by a tag and accessing each group as a separate `Data` object.
 
+Dataset : Collection of multiple Data objects with analysis capabilities.
+    Manages multiple data files and provides methods for cross-data analysis and comparison.
+
 Examples
 --------
 Basic usage:
@@ -27,6 +30,10 @@ Tagged data usage:
     >>> tagged_data = TaggedData("data.csv", tag="tag")
     >>> data = tagged_data.get("specific_tag")
     >>> print(group.param("column_name"))
+
+Dataset usage:
+    >>> dataset = Dataset(["data1.csv", "data2.csv"])
+    >>> t, y = dataset.get_timeseries("value_column")
 
 This module is designed to streamline operations with tabular data in data analysis, data plotting,
 and other applications requiring structured data handling.
@@ -100,17 +107,17 @@ class BaseData:
         data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
         separator : str
-            Single byte character to use as separator in the file.
+            Single byte character to use as separator in the source, by default ",".
         has_header : bool, optional
-            Indicate if the first row of the dataset is a header or not.
+            Indicate if the first row of the dataset is a header or not, by default True.
         columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
         names : Sequence[str], optional
-            Rename columns right after parsing the CSV file.
+            Rename columns right after parsing the source.
         n_rows : int, optional
             Number of rows to read.
         comment : str, optional
-            Character to indicate comments in the data file.
+            Character to indicate comments in the data source.
 
         Raises
         ------
@@ -154,7 +161,7 @@ class BaseData:
         file_or_buffer : str | Path | StringIO
             The file or buffer containing the data.
         separator : str
-            Single byte character to use as separator in the file..
+            Single byte character to use as separator in the file.
         comment : str
             Character indicating commented lines.
 
@@ -204,18 +211,18 @@ class BaseData:
         ----------
         file_or_buffer : str | Path | StringIO
             The file or buffer to read from.
-        separator : str, optional
-            Single byte character to use as separator in the file..
-        has_header : bool, optional
+        separator : str
+            Single byte character to use as separator in the source.
+        has_header : bool
             Indicate if the first row of the dataset is a header or not.
-        columns : Sequence[int], Sequence[str] or range, optional
+        columns : Sequence[int], Sequence[str] or range
             Columns to read from the data source.
-        names : Sequence[str], optional
-            Rename columns right after parsing the CSV file.
-        n_rows : int, optional
+        names : Sequence[str]
+            Rename columns right after parsing the source.
+        n_rows : int
             Number of rows to read.
-        comment : str, optional
-            Character to indicate comments in the data file.
+        comment : str
+            Character to indicate comments in the data source.
 
         Returns
         -------
@@ -404,17 +411,17 @@ class Data(BaseData):
         data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
         separator : str
-            Single byte character to use as separator in the file.
+            Single byte character to use as separator in the source, by default ",".
         has_header : bool, optional
-            Indicate if the first row of the dataset is a header or not.
+            Indicate if the first row of the dataset is a header or not, by default True.
         columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
         names : Sequence[str], optional
-            Rename columns right after parsing the CSV file.
+            Rename columns right after parsing the source.
         n_rows : int, optional
             Number of rows to read.
         comment : str, optional
-            Character to indicate comments in the data file.
+            Character to indicate comments in the data source.
 
         Raises
         ------
@@ -571,6 +578,24 @@ class Data(BaseData):
         return subset.row(0)
 
     def _copy_datapath_if_loaded_from_file(self, dest_data: Data) -> Data:
+        """Copy datapath from source to destination Data object if source was loaded from file.
+
+        Parameters
+        ----------
+        dest_data : Data
+            Destination Data object to copy datapath to
+
+        Returns
+        -------
+        Data
+            Data object with copied datapath if applicable
+
+        Warns
+        -----
+        UserWarning
+            If source data was not loaded from file
+
+        """
         try:
             dest_data.set_datapath(self.datapath)
         except AttributeError as e:
@@ -587,6 +612,22 @@ class Data(BaseData):
         rename_mapping: dict[str, str] | Sequence[str] | None = None,
         keep_datapath: bool = False,
     ) -> Data:
+        """Create a clone of the current Data object.
+
+        Parameters
+        ----------
+        rename_mapping : dict[str, str] | Sequence[str] | None, optional
+            Mapping to rename columns in the cloned data. If sequence, maps existing column names to
+            new names in order.
+        keep_datapath : bool, optional
+            Whether to preserve the datapath in the cloned object, by default False.
+
+        Returns
+        -------
+        Data
+            A new Data object with cloned content.
+
+        """
         if isinstance(rename_mapping, Mapping):
             cloned_df = self.df.rename(rename_mapping)
         elif isinstance(rename_mapping, Sequence):
@@ -607,6 +648,28 @@ class Data(BaseData):
         rename_mapping: dict[str, str] | Sequence[str] | None = None,
         keep_datapath: bool = False,
     ) -> Data:
+        """Create a subset of the current Data object.
+
+        Parameters
+        ----------
+        key : Sequence[str]
+            Column names to include in subset
+        start : int | None, optional
+            Start index for row selection, by default None.
+        end : int | None, optional
+            End index for row selection, by default None.
+        rename_mapping : dict[str, str] | Sequence[str] | None, optional
+            Mapping to rename columns in subset. If sequence, maps existing column names to new
+            names in order.
+        keep_datapath : bool, optional
+            Whether to preserve the datapath in subset, by default False.
+
+        Returns
+        -------
+        Data
+            A new Data object containing the specified subset.
+
+        """
         subset_df = self[start:end, key]
         if isinstance(rename_mapping, Mapping):
             subset_df = subset_df.rename(rename_mapping)
@@ -655,17 +718,17 @@ class TaggedData(BaseData):
         data_source : str | Path | StringIO | pl.DataFrame | pl.Series
             The data source.
         separator : str
-            Single byte character to use as separator in the file.
+            Single byte character to use as separator in the source, by default ",".
         has_header : bool, optional
-            Indicate if the first row of the dataset is a header or not.
+            Indicate if the first row of the dataset is a header or not, by default True.
         columns : Sequence[int], Sequence[str] or range, optional
             Columns to read from the data source.
         names : Sequence[str], optional
-            Rename columns right after parsing the CSV file.
+            Rename columns right after parsing the source.
         n_rows : int, optional
             Number of rows to read.
         comment : str, optional
-            Character to indicate comments in the data file.
+            Character to indicate comments in the data source.
         tag_column : str, optional
             Column name used to tag and group data.
 
@@ -712,7 +775,14 @@ class TaggedData(BaseData):
         return len(self._datadict)
 
     def _make_groups(self, tag_column_name: str) -> None:
-        """Group the data by the specified tag and stores it in `datadict`."""
+        """Group data by specified tag column and store in internal dictionary.
+
+        Parameters
+        ----------
+        tag_column_name : str
+            Name of column to use for grouping
+
+        """
         try:
             self._datadict = {
                 str(name[0]): Data(group.drop(tag_column_name))
@@ -845,6 +915,24 @@ class TaggedData(BaseData):
 
 
 class Dataset:
+    """A class for managing multiple Data objects as a collection.
+
+    This class provides functionality to load and handle multiple Data objects from files
+    or directories, with methods to access and analyze data across the collection.
+
+    Attributes
+    ----------
+    dataset : list[Data]
+        List of Data objects in the collection
+    datapaths : list[Path]
+        List of paths to data files
+    datadirs : list[Path]
+        List of unique directory paths containing data files
+    min_n_rows : int
+        Minimum number of rows across all Data objects
+
+    """
+
     _dataset: list[Data]
 
     def __init__(
@@ -860,6 +948,30 @@ class Dataset:
         glob_pattern: str = "**/*.csv",
         n_pickup_per_directory: int | None = None,
     ) -> None:
+        """Initialize Dataset with data from specified sources.
+
+        Parameters
+        ----------
+        source_paths : FilePath | Iterable[FilePath]
+            Path(s) to data files or directories.
+        separator : str, optional
+            Single byte character to use as separator in the file, by default ",".
+        has_header : bool, optional
+            Whether data files have headers, by default True.
+        columns : Sequence[int] | Sequence[str] | None, optional
+            Columns to read from files.
+        names : Sequence[str] | None, optional
+            Names to assign to columns.
+        n_rows : int | None, optional
+            Number of rows to read.
+        comment : str | None, optional
+            Character to indicate comments in data files.
+        glob_pattern : str, optional
+            Pattern for finding files in directories, by default "**/*.csv".
+        n_pickup_per_directory : int | None, optional
+            Maximum number of files to load per directory.
+
+        """
         self._dataset = Dataset.load_dataset(
             source_paths,
             separator=separator,
@@ -873,9 +985,23 @@ class Dataset:
         )
 
     def __len__(self) -> int:
+        """Return the number of Data objects in the dataset.
+
+        Returns
+        -------
+        int
+            Number of Data objects.
+        """
         return len(self._dataset)
 
     def __iter__(self) -> Iterator[Data]:
+        """Return an iterator over the Data objects.
+
+        Returns
+        -------
+        Iterator[Data]
+            Iterator yielding Data objects.
+        """
         return iter(self._dataset)
 
     @overload
@@ -885,18 +1011,51 @@ class Dataset:
     def __gettiem__(self, index: slice) -> list[Data]: ...
 
     def __gettiem__(self, index):
+        """Access Data object(s) by index.
+
+        Parameters
+        ----------
+        index : int or slice
+            Index or slice to access Data objects.
+
+        Returns
+        -------
+        Data or list[Data]
+            Single Data object if index is int, list of Data objects if slice.
+        """
         return self._dataset[index]
 
     @property
     def datapaths(self) -> list[Path]:
+        """Get paths of all data files in the dataset.
+
+        Returns
+        -------
+        list[Path]
+            List of paths to data files.
+        """
         return [data.datapath for data in self]
 
     @property
     def datadirs(self) -> list[Path]:
+        """Get unique directory paths containing data files.
+
+        Returns
+        -------
+        list[Path]
+            List of unique directory paths.
+        """
         return list(OrderedDict.fromkeys(self.datapaths))
 
     @property
     def dataset(self) -> list[Data]:
+        """Get the list of Data objects.
+
+        Returns
+        -------
+        list[Data]
+            List of Data objects in the dataset.
+        """
         return self._dataset
 
     @staticmethod
@@ -912,6 +1071,40 @@ class Dataset:
         glob_pattern: str = "**/*.csv",
         n_pickup_per_directory: int | None = None,
     ) -> list[Data]:
+        """Load multiple Data objects from specified sources.
+
+        Parameters
+        ----------
+        source_paths : FilePath | Iterable[FilePath]
+            Path(s) to data files or directories.
+        separator : str, optional
+            Single byte character to use as separator in the file, by default ",".
+        has_header : bool, optional
+            Whether data files have headers, by default True.
+        columns : Sequence[int] | Sequence[str] | None, optional
+            Columns to read from files.
+        names : Sequence[str] | None, optional
+            Names to assign to columns.
+        n_rows : int | None, optional
+            Number of rows to read.
+        comment : str | None, optional
+            Character to indicate comments in data files.
+        glob_pattern : str, optional
+            Pattern for finding files in directories, by default "**/*.csv".
+        n_pickup_per_directory : int | None, optional
+            Maximum number of files to load per directory.
+
+        Returns
+        -------
+        list[Data]
+            List of loaded Data objects.
+
+        Raises
+        ------
+        ValueError
+            If source path does not exist.
+
+        """
         if isinstance(source_paths, FilePath):
             source_paths = [source_paths]
 
@@ -945,15 +1138,50 @@ class Dataset:
 
     @cached_property
     def min_n_rows(self) -> int:
+        """Get the minimum number of rows across all Data objects.
+
+        Returns
+        -------
+        int
+            Minimum number of rows.
+        """
         return min(map(len, self._dataset))
 
     def get_columns(self, name: str, *, aligned: bool = True) -> list[pl.Series]:
+        """Get columns with specified name from all Data objects.
+
+        Parameters
+        ----------
+        name : str
+            Column name to retrieve.
+        aligned : bool, optional
+            Whether to align columns to minimum length, by default True.
+
+        Returns
+        -------
+        list[pl.Series]
+            List of columns from each Data object.
+
+        """
         if not aligned:
             return [data.get_column(name) for data in self]
         n = self.min_n_rows
         return [data.get_column(name)[:n] for data in self]
 
     def get_columns_as_array(self, name: str) -> np.ndarray:
+        """Get columns as a numpy array with aligned lengths.
+
+        Parameters
+        ----------
+        name : str
+            Column name to retrieve.
+
+        Returns
+        -------
+        np.ndarray
+            Array containing aligned columns from all Data objects.
+
+        """
         return np.asarray(self.get_columns(name, aligned=True))
 
     def get_axis_data(
@@ -963,6 +1191,23 @@ class Dataset:
         *,
         x_axis_index: int = 0,
     ) -> tuple[np.ndarray, np.ndarray]:
+        """Get x-axis and y-axis data for plotting.
+
+        Parameters
+        ----------
+        x_axis_name : str
+            Column name for x-axis.
+        y_data_name : str
+            Column name for y-axis.
+        x_axis_index : int, optional
+            Index of Data object to use for x-axis, by default 0.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            X-axis values and corresponding Y-axis values.
+
+        """
         y = self.get_columns_as_array(y_data_name)
         n = y.shape[1]
         x = self._dataset[x_axis_index].get_column(x_axis_name).to_numpy()[:n]
@@ -971,16 +1216,35 @@ class Dataset:
     def get_timeseries(
         self,
         name: str,
-        t_shift: float = 0.0,
         *,
+        t_shift: float = 0.0,
         t_axis_name: str = "t",
         t_axis_index: int = 0,
     ) -> tuple[np.ndarray, np.ndarray]:
+        """Get time series data with optional time shift.
+
+        Parameters
+        ----------
+        name : str
+            Name of data column.
+        t_shift : float, optional
+            Time shift to apply, by default 0.0.
+        t_axis_name : str, optional
+            Name of time axis column, by default "t".
+        t_axis_index : int, optional
+            Index of Data object to use for time axis, by default 0.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Time values and corresponding data values.
+
+        """
         t, y = self.get_axis_data(t_axis_name, name, x_axis_index=t_axis_index)
         t = t - t_shift
         return t, y
 
 
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datadir dataframe datapath dataset dtype ndarray np param polars str"
+# jinx-local-words: "Iterable StringIO csv datadict datadir datadirs dataframe datapath datapaths dataset dest dtype ndarray noqa np numpy param polars str timeseries" # noqa: E501
 # End:
