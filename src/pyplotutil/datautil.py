@@ -1005,12 +1005,12 @@ class Dataset:
         return iter(self._dataset)
 
     @overload
-    def __gettiem__(self, index: int) -> Data: ...
+    def __getitem__(self, index: int) -> Data: ...
 
     @overload
-    def __gettiem__(self, index: slice) -> list[Data]: ...
+    def __getitem__(self, index: slice) -> list[Data]: ...
 
-    def __gettiem__(self, index):
+    def __getitem__(self, index):
         """Access Data object(s) by index.
 
         Parameters
