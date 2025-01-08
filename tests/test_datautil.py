@@ -14,12 +14,13 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
 import numpy.testing as nt
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 
-from pyplotutil.datautil import Data, TaggedData
+from pyplotutil.datautil import Data, Dataset, TaggedData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -472,18 +473,21 @@ def test_data_param_list(default_data: Data, cols: list[str], expected: list[flo
 
 
 def test_data_clone(default_data: Data) -> None:
+    """Test basic Data clone functionality with DataFrame content verification."""
     cloned_data = default_data.clone()
     assert_frame_equal(cloned_data.df, default_data.df)
     assert not cloned_data.is_loaded_from_file()
 
 
 def test_data_clone_keep_datapath(default_data: Data) -> None:
+    """Test Data clone with datapath preservation and content verification."""
     cloned_data = default_data.clone(keep_datapath=True)
     assert_frame_equal(cloned_data.df, default_data.df)
     assert cloned_data.datapath == default_data.datapath
 
 
 def test_data_clone_keep_datapath_warn() -> None:
+    """Test warning generation when cloning Data without file path."""
     data = Data(StringIO(TEST_TEXT))
     msg = "clone: Source Data object may not be loaded from a file."
     with pytest.warns(UserWarning, match=msg):
@@ -499,6 +503,7 @@ def test_data_clone_keep_datapath_warn() -> None:
     ],
 )
 def test_data_clone_rename_sequence(default_data: Data, mapping: Sequence[str]) -> None:
+    """Test Data clone with sequential column renaming functionality."""
     cloned_data = default_data.clone(rename_mapping=mapping)
     expected = default_data.df.rename(dict(zip(default_data.columns, mapping, strict=True)))
     assert_frame_equal(cloned_data.df, expected)
@@ -512,6 +517,7 @@ def test_data_clone_rename_sequence(default_data: Data, mapping: Sequence[str]) 
     ],
 )
 def test_data_clone_rename_mapping(default_data: Data, mapping: dict[str, str]) -> None:
+    """Test Data clone with dictionary-based column renaming functionality."""
     cloned_data = default_data.clone(rename_mapping=mapping)
     expected = default_data.df.rename(mapping)
     assert_frame_equal(cloned_data.df, expected)
@@ -538,6 +544,7 @@ def test_data_subset(
     keep_datapath: bool,
     expected: pl.DataFrame,
 ) -> None:
+    """Test Data subset creation with various parameters including slicing and renaming."""
     subset_data = default_data.subset(
         key,
         start=start,
@@ -757,6 +764,201 @@ def test_tagged_data_param_list_unpack(default_tagged_data: TaggedData) -> None:
     assert c == expected_values[2]
 
 
+def sample_data_files(tmp_path: Path = DATA_DIR_PATH) -> tuple[Path, ...]:
+    """Create sample CSV files for testing."""
+    data1 = pl.DataFrame({"t": [0, 1, 2], "value": [10, 20, 30]})
+    data2 = pl.DataFrame({"t": [0, 1, 2, 3], "value": [15, 25, 35, 45]})
+    data3 = pl.DataFrame({"t": [0, 1, 2, 3, 4], "value": [12, 23, 34, 45, 56]})
+
+    file1 = tmp_path / "data1.csv"
+    file2 = tmp_path / "data2.csv"
+    file3 = tmp_path / "data3.csv"
+    data1.write_csv(file1)
+    data2.write_csv(file2)
+    data3.write_csv(file3)
+
+    return file1, file2, file3
+
+
+@pytest.mark.parametrize(
+    "data_file",
+    [
+        DATA_DIR_PATH / "data1.csv",
+        DATA_DIR_PATH / "data2.csv",
+    ],
+)
+def test_dataset_initialization_file(data_file: Path) -> None:
+    """Test Dataset initialization with a file path."""
+    dataset = Dataset(data_file)
+    assert len(dataset) == 1
+    expected = pl.read_csv(data_file)
+    assert_frame_equal(dataset[0].df, expected)
+
+
+@pytest.mark.parametrize(
+    "data_files",
+    [
+        [DATA_DIR_PATH / "data1.csv"],
+        [DATA_DIR_PATH / "data2.csv"],
+        [DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")],
+        [DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv", "data3.csv")],
+    ],
+)
+def test_dataset_initialization_multi_files(data_files: list[Path]) -> None:
+    """Test Dataset initialization with file paths."""
+    dataset = Dataset(data_files)
+    assert len(dataset) == len(data_files)
+    for i, data_file in enumerate(data_files):
+        expected = pl.read_csv(data_file)
+        assert_frame_equal(dataset[i].df, expected)
+
+
+def test_dataset_initialize_from_directory() -> None:
+    """Test Dataset initialization from directory."""
+    expected_file_paths = [DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv", "data3.csv")]
+    dataset = Dataset(DATA_DIR_PATH, glob_pattern="data?.csv")
+    assert len(dataset) == len(expected_file_paths)
+    assert dataset.datapaths == expected_file_paths
+    assert dataset.datadirs == [DATA_DIR_PATH]
+    for i, data_file in enumerate(expected_file_paths):
+        expected = pl.read_csv(data_file)
+        assert_frame_equal(dataset[i].df, expected)
+
+
+def test_dataset_initialize_from_directory_and_file() -> None:
+    """Test Dataset initialization from directory and file."""
+    expected_file_paths = [DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv", "data3.csv")]
+    expected_file_paths.append(DATA_DIR_PATH / "test.csv")
+    dataset = Dataset([DATA_DIR_PATH, DATA_DIR_PATH / "test.csv"], glob_pattern="data?.csv")
+    assert len(dataset) == len(expected_file_paths)
+    assert dataset.datapaths == expected_file_paths
+    assert dataset.datadirs == [DATA_DIR_PATH]
+    for i, data_file in enumerate(expected_file_paths):
+        expected = pl.read_csv(data_file)
+        assert_frame_equal(dataset[i].df, expected)
+
+
+@pytest.mark.parametrize(
+    ("data_files", "expected"),
+    [
+        ([DATA_DIR_PATH / "data1.csv"], 3),
+        ([DATA_DIR_PATH / "data2.csv"], 4),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 3),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv", "data3.csv")], 3),
+    ],
+)
+def test_min_n_rows(data_files: list[Path], expected: int) -> None:
+    """Test min_n_rows property."""
+    dataset = Dataset(data_files)
+    assert dataset.min_n_rows == expected
+
+
+def test_dataset_iteration() -> None:
+    """Test dataset iteration."""
+    dataset = Dataset(DATA_DIR_PATH, glob_pattern="data?.csv")
+    data_objects = list(dataset)
+    assert len(data_objects) == len(dataset)
+    assert all(isinstance(d, Data) for d in dataset)
+    assert all(isinstance(d, Data) for d in data_objects)
+
+
+def test_dataset_indexing() -> None:
+    """Test dataset indexing."""
+    dataset = Dataset(DATA_DIR_PATH, glob_pattern="data?.csv")
+    assert isinstance(dataset[0], Data)
+    assert isinstance(dataset[0:2], list)
+
+
+@pytest.mark.parametrize(
+    ("data_files", "n_data"),
+    [
+        ([DATA_DIR_PATH], 3),
+        ([DATA_DIR_PATH / "data2.csv"], 1),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 2),
+    ],
+)
+def test_get_columns(data_files: list[Path], n_data: int) -> None:
+    """Test getting columns from dataset."""
+    dataset = Dataset(data_files, glob_pattern="data?.csv")
+    columns = dataset.get_columns("value", aligned=False)
+    assert len(columns) == n_data
+    assert all(isinstance(col, pl.Series) for col in columns)
+
+
+@pytest.mark.parametrize(
+    ("data_files", "n_data", "n_rows"),
+    [
+        ([DATA_DIR_PATH], 3, 3),
+        ([DATA_DIR_PATH / "data2.csv"], 1, 4),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 2, 3),
+    ],
+)
+def test_get_columns_aligned(data_files: list[Path], n_data: int, n_rows: int) -> None:
+    """Test getting aligned columns from dataset."""
+    dataset = Dataset(data_files, glob_pattern="data?.csv")
+    columns = dataset.get_columns("value", aligned=True)
+    assert len(columns) == n_data
+    assert dataset.min_n_rows == n_rows
+    assert all(len(col) == n_rows for col in columns)
+
+
+@pytest.mark.parametrize(
+    ("data_files", "n_data", "n_rows"),
+    [
+        ([DATA_DIR_PATH], 3, 3),
+        ([DATA_DIR_PATH / "data2.csv"], 1, 4),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 2, 3),
+    ],
+)
+def test_get_columns_as_array(data_files: list[Path], n_data: int, n_rows: int) -> None:
+    """Test getting columns as numpy array."""
+    dataset = Dataset(data_files, glob_pattern="data?.csv")
+    array = dataset.get_columns_as_array("value")
+    assert isinstance(array, np.ndarray)
+    assert array.shape == (n_data, n_rows)
+
+
+@pytest.mark.parametrize(
+    ("data_files", "n_data", "n_rows"),
+    [
+        ([DATA_DIR_PATH], 3, 3),
+        ([DATA_DIR_PATH / "data2.csv"], 1, 4),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 2, 3),
+    ],
+)
+def test_get_axis_data(data_files: list[Path], n_data: int, n_rows: int) -> None:
+    """Test getting x-y axis data."""
+    dataset = Dataset(data_files, glob_pattern="data?.csv")
+    x, y = dataset.get_axis_data("t", "value")
+    assert isinstance(x, np.ndarray)
+    assert x.ndim == 1
+    assert x.shape == (n_rows,)
+    assert isinstance(y, np.ndarray)
+    assert y.shape == (n_data, n_rows)
+    assert len(x) == len(y[0])
+
+
+@pytest.mark.parametrize(
+    ("data_files", "n_data", "n_rows", "t_shift"),
+    [
+        ([DATA_DIR_PATH], 3, 3, 0.0),
+        ([DATA_DIR_PATH / "data2.csv"], 1, 4, 0.5),
+        ([DATA_DIR_PATH / file for file in ("data1.csv", "data2.csv")], 2, 3, 1.0),
+    ],
+)
+def test_get_timeseries(data_files: list[Path], n_data: int, n_rows: int, t_shift: float) -> None:
+    """Test getting time series data."""
+    dataset = Dataset(data_files, glob_pattern="data?.csv")
+    t, values = dataset.get_timeseries("value", t_shift=t_shift)
+    assert isinstance(t, np.ndarray)
+    assert t.ndim == 1
+    assert t.shape == (n_rows,)
+    assert isinstance(values, np.ndarray)
+    assert values.shape == (n_data, n_rows)
+    assert len(t) == len(values[0])
+    assert t[0] == -t_shift  # Check t_shift applied
+
+
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datautil filepath len noqa polars txt usecols"
+# jinx-local-words: "StringIO csv datadict datapath dataset datautil filepath len noqa numpy polars txt usecols"
 # End:
