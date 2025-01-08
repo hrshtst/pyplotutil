@@ -1,3 +1,44 @@
+"""Plotting Utilities for Scientific Data Visualization.
+
+This module provides a collection of utilities for creating and saving scientific plots,
+particularly focused on time series data visualization with error representations.
+
+Key Features
+-----------
+- Save figures with multiple file formats
+- Plot multiple time series with customizable styles
+- Error visualization (standard deviation, variance, range, standard error)
+- Path handling utilities for figure organization
+
+Examples
+--------
+Basic figure saving:
+>>> fig, ax = plt.subplots()
+>>> ax.plot([1, 2, 3], [1, 2, 3])
+>>> save_figure(fig, "output", "my_plot", "png")
+
+Time series with error bars:
+>>> t = np.linspace(0, 10, 100)
+>>> data = np.random.randn(5, 100)  # 5 trials, 100 timepoints
+>>> plot_mean_err(ax, t, data, err_type="std", tlim=(0, 5))
+
+Multiple time series:
+>>> y_arr = np.array([np.sin(t), np.cos(t)])
+>>> plot_multi_timeseries(ax, t, y_arr, labels=["sin", "cos"])
+
+See Also
+--------
+matplotlib.pyplot : The base plotting library
+numpy : Numerical computing library used for data processing
+
+Notes
+-----
+- All plotting functions return matplotlib objects for further customization
+- Error calculations support various statistical measures
+- File paths are sanitized for cross-platform compatibility
+
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,6 +64,19 @@ FilePathT = TypeVar("FilePathT", str, Path)
 
 
 def compatible_filename(filename: FilePathT) -> FilePathT:
+    """Convert filename to a compatible format by replacing special characters.
+
+    Parameters
+    ----------
+    filename : str or Path
+        The input filename to be converted.
+
+    Returns
+    -------
+    str or Path
+        The converted filename with special characters replaced.
+
+    """
     table = {":": "", " ": "_", "(": "", ")": "", "+": "x", "=": "-"}
     compat_filename = str(filename).translate(str.maketrans(table))  # type: ignore[arg-type]
     if compat_filename != str(filename):
@@ -33,13 +87,34 @@ def compatible_filename(filename: FilePathT) -> FilePathT:
 
 
 def make_figure_paths(
-    output_direcotry: FilePath,
+    output_directory: FilePath,
     basename: str,
     extensions: str | Iterable[str],
     *,
     separate_dir_by_main_module: bool | str,
     separate_dir_by_ext: bool,
 ) -> list[Path]:
+    """Generate figure file paths based on given parameters.
+
+    Parameters
+    ----------
+    output_directory : FilePath
+        Directory where figures will be saved.
+    basename : str
+        Base name for the figure files.
+    extensions : str or Iterable[str]
+        File extensions to use.
+    separate_dir_by_main_module : bool or str
+        Whether to create separate directory by main module.
+    separate_dir_by_ext : bool
+        Whether to separate files by extension in different directories.
+
+    Returns
+    -------
+    list[Path]
+        List of generated figure paths.
+
+    """
     if isinstance(extensions, str):
         extensions = [extensions]
     # Make a generator that ensures each extension starts with '.', and remove duplicates.
@@ -56,7 +131,7 @@ def make_figure_paths(
         except ImportError:
             main_module_name = None
 
-    built_path = Path(output_direcotry)
+    built_path = Path(output_directory)
     if main_module_name:
         built_path /= main_module_name
     built_path /= basename
@@ -88,6 +163,42 @@ def save_figure(
     bbox_inches: Literal["tight"] | None = "tight",
     pad_inches: float | Literal["layout"] = 0.1,
 ) -> list[Path]:
+    """Save figure to specified paths with given parameters.
+
+    Parameters
+    ----------
+    fig : Figure
+        Matplotlib figure object to save.
+    output_directory : FilePath
+        Directory where figures will be saved.
+    basename : str
+        Base name for the figure files.
+    extensions : str or Iterable[str] or None
+        File extensions to use.
+    separate_dir_by_main_module : bool or str, optional
+        Whether to create separate directory by main module, by default False.
+    separate_dir_by_ext : bool, optional
+        Whether to separate files by extension, by default False.
+    make_directories : bool, optional
+        Whether to create directories if they don't exist, by default True.
+    dpi : float or "figure", optional
+        Resolution of the output figure, by default "figure".
+    bbox_inches : "tight" or None, optional
+        Bounding box in inches, by default "tight".
+    pad_inches : float or "layout", optional
+        Padding in inches, by default 0.1.
+
+    Returns
+    -------
+    list[Path]
+        List of paths where figures were saved.
+
+    Raises
+    ------
+    ValueError
+        If output_directory is None.
+
+    """
     if output_directory is None:
         msg = f"'None' is not allowed for directory path: {output_directory}, {type(output_directory)}"
         evlog().critical(msg)
@@ -118,6 +229,19 @@ def save_figure(
 
 
 def extract_common_path(*paths: str | Path) -> Path:
+    """Extract the common path from multiple file paths.
+
+    Parameters
+    ----------
+    *paths : str or Path
+        Variable number of path arguments.
+
+    Returns
+    -------
+    Path
+        Common path shared between all input paths.
+
+    """
     are_absolute = [x.is_absolute() for x in map(Path, paths)]
     if not all(are_absolute) and any(are_absolute):
         # When absolute and relative paths are mixed, convert them to absolute ones.
@@ -146,6 +270,21 @@ def extract_common_path(*paths: str | Path) -> Path:
 
 
 def get_tlim_mask(t: np.ndarray, tlim: tuple[float, float] | None) -> np.ndarray:
+    """Create a boolean mask for time limits.
+
+    Parameters
+    ----------
+    t : np.ndarray
+        Time array.
+    tlim : tuple[float, float] or None
+        Time limits (min, max).
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask array.
+
+    """
     return np.full(t.shape, fill_value=True) if tlim is None else (t >= tlim[0]) & (t <= tlim[1])
 
 
@@ -154,6 +293,32 @@ def calculate_mean_err(
     err_type: str = "std",
     ddof: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """Calculate mean and error metrics for data array.
+
+    Parameters
+    ----------
+    data_array : np.ndarray
+        Input data array.
+    err_type : str, optional
+        Type of error to calculate ("std", "var", "range", "se", "ci"), by default "std".
+    ddof : int, optional
+        Delta degrees of freedom, by default 0.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray | None]
+        Mean, error1, and error2 (if applicable) arrays.
+
+    Raises
+    ------
+    TypeError
+        If err_type is not a string.
+    ValueError
+        If err_type is not recognized.
+    NotImplementedError
+        If err_type is "ci".
+
+    """
     if not isinstance(err_type, str):
         msg = f"`err_type` must be string: {err_type}, (type: {type(err_type)})"
         raise TypeError(msg)
@@ -201,6 +366,35 @@ def plot_multi_timeseries(
     labels: str | Iterable[str] | None = None,
     cmap_name: str = "tab10",
 ) -> list[Line2D]:
+    """Plot multiple time series on the same axes.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    t : np.ndarray
+        Time array.
+    y_arr : np.ndarray
+        Array of y values.
+    tlim : tuple[float, float] or None
+        Time limits.
+    lw : int or None
+        Line width.
+    color : ColorType or None, optional
+        Line color, by default None.
+    fmt : str or None, optional
+        Format string, by default None.
+    labels : str or Iterable[str] or None, optional
+        Labels for lines, by default None.
+    cmap_name : str, optional
+        Colormap name, by default "tab10".
+
+    Returns
+    -------
+    list[Line2D]
+        List of plotted lines.
+
+    """
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
     cmap = plt.get_cmap(cmap_name)
@@ -243,6 +437,37 @@ def plot_mean_err(
     fmt: str | None = None,
     label: str | None = None,
 ) -> Line2D:
+    """Plot mean with error bars.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    t : np.ndarray
+        Time array.
+    y_arr : np.ndarray
+        Array of y values.
+    err_type : str or None
+        Type of error to plot.
+    tlim : tuple[float, float] or None
+        Time limits.
+    lw : int or None
+        Line width.
+    capsize : int or None
+        Size of error bar caps.
+    color : ColorType or None, optional
+        Line color, by default None.
+    fmt : str or None, optional
+        Format string, by default None.
+    label : str or None, optional
+        Label for the plot, by default None.
+
+    Returns
+    -------
+    Line2D
+        The plotted line.
+
+    """
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
 
@@ -282,6 +507,40 @@ def fill_between_err(
     interpolation: bool = False,
     suppress_exception: bool = False,
 ) -> Axes:
+    """Fill between error bounds.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    t : np.ndarray
+        Time array.
+    y_arr : np.ndarray
+        Array of y values.
+    err_type : str or None
+        Type of error to fill.
+    tlim : tuple[float, float] or None
+        Time limits.
+    color : ColorType or None
+        Fill color.
+    alpha : float or None
+        Fill transparency.
+    interpolation : bool, optional
+        Whether to use interpolation, by default False.
+    suppress_exception : bool, optional
+        Whether to suppress exceptions, by default False.
+
+    Returns
+    -------
+    Axes
+        The modified axes object.
+
+    Raises
+    ------
+    ValueError
+        If err_type is None and suppress_exception is False.
+
+    """
     if err_type is None or err_type == "none":
         if suppress_exception:
             return ax
