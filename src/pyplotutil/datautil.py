@@ -1045,7 +1045,7 @@ class Dataset:
         list[Path]
             List of unique directory paths.
         """
-        return list(OrderedDict.fromkeys(self.datapaths))
+        return list(OrderedDict.fromkeys(x.parent for x in self.datapaths))
 
     @property
     def dataset(self) -> list[Data]:
@@ -1209,7 +1209,7 @@ class Dataset:
 
         """
         y = self.get_columns_as_array(y_data_name)
-        n = y.shape[1]
+        n = self.min_n_rows
         x = self._dataset[x_axis_index].get_column(x_axis_name).to_numpy()[:n]
         return x, y
 
