@@ -15,7 +15,7 @@ Examples
 Basic figure saving:
 >>> fig, ax = plt.subplots()
 >>> ax.plot([1, 2, 3], [1, 2, 3])
->>> save_figure(fig, "output", "my_plot", "png")
+>>> save_figure(fig, "output_directory", "my_plot", ".png")
 
 Time series with error bars:
 >>> t = np.linspace(0, 10, 100)
@@ -25,11 +25,6 @@ Time series with error bars:
 Multiple time series:
 >>> y_arr = np.array([np.sin(t), np.cos(t)])
 >>> plot_multi_timeseries(ax, t, y_arr, labels=["sin", "cos"])
-
-See Also
---------
-matplotlib.pyplot : The base plotting library
-numpy : Numerical computing library used for data processing
 
 Notes
 -----
@@ -98,14 +93,14 @@ def make_figure_paths(
 
     Parameters
     ----------
-    output_directory : FilePath
+    output_directory : str or Path
         Directory where figures will be saved.
     basename : str
         Base name for the figure files.
     extensions : str or Iterable[str]
         File extensions to use.
     separate_dir_by_main_module : bool or str
-        Whether to create separate directory by main module.
+        Whether to create separate directory by main module name.
     separate_dir_by_ext : bool
         Whether to separate files by extension in different directories.
 
@@ -163,20 +158,20 @@ def save_figure(
     bbox_inches: Literal["tight"] | None = "tight",
     pad_inches: float | Literal["layout"] = 0.1,
 ) -> list[Path]:
-    """Save figure to specified paths with given parameters.
+    """Save figures to specified paths with given parameters.
 
     Parameters
     ----------
     fig : Figure
         Matplotlib figure object to save.
-    output_directory : FilePath
+    output_directory : str or Path
         Directory where figures will be saved.
     basename : str
         Base name for the figure files.
     extensions : str or Iterable[str] or None
         File extensions to use.
     separate_dir_by_main_module : bool or str, optional
-        Whether to create separate directory by main module, by default False.
+        Whether to create separate directory by main module name, by default False.
     separate_dir_by_ext : bool, optional
         Whether to separate files by extension, by default False.
     make_directories : bool, optional
@@ -373,7 +368,7 @@ def plot_multi_timeseries(
     ax : Axes
         Matplotlib axes object.
     t : np.ndarray
-        Time array.
+        Array of time values.
     y_arr : np.ndarray
         Array of y values.
     tlim : tuple[float, float] or None
@@ -444,7 +439,7 @@ def plot_mean_err(
     ax : Axes
         Matplotlib axes object.
     t : np.ndarray
-        Time array.
+        Array of time values.
     y_arr : np.ndarray
         Array of y values.
     err_type : str or None
@@ -514,7 +509,7 @@ def fill_between_err(
     ax : Axes
         Matplotlib axes object.
     t : np.ndarray
-        Time array.
+        Array of time values.
     y_arr : np.ndarray
         Array of y values.
     err_type : str or None
@@ -567,5 +562,5 @@ def fill_between_err(
 
 
 # Local Variables:
-# jinx-local-words: "arg ci csv dataset sd se"
+# jinx-local-words: "Colormap FilePathT Iterable arg basename bbox ci cmap csv customizable dataset ddof dir facecolor fmt linspace lw matplotlib ndarray noqa np plt png randn sd se str timepoints timeseries tlim" # noqa: E501
 # End:

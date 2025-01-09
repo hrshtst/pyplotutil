@@ -1,5 +1,5 @@
 # ruff: noqa: S101
-"""Unit tests for plotting utility functions in pyplotutil.plotutil module.
+"""Unit tests for plotting utility functions.
 
 This test suite covers:
 - Filename compatibility conversion for both string and Path objects
@@ -10,8 +10,8 @@ This test suite covers:
     * Duplicate extension handling
 - Common path extraction functionality
 
-The tests use parametrized fixtures to verify multiple input scenarios
-and edge cases for each function.
+The tests use parametrized fixtures to verify multiple input scenarios and edge cases for each function.
+
 """
 
 from __future__ import annotations
@@ -41,16 +41,7 @@ if TYPE_CHECKING:
     ],
 )
 def test_compatible_filename(filename: str, expected: str) -> None:
-    """Test string filename compatibility conversion.
-
-    Parameters
-    ----------
-    filename : str
-        Input filename to test
-    expected : str
-        Expected converted filename
-
-    """
+    """Test string filename compatibility conversion."""
     converted = compatible_filename(filename)
     assert type(converted) is str
     assert converted == expected
@@ -69,16 +60,7 @@ def test_compatible_filename(filename: str, expected: str) -> None:
     ],
 )
 def test_compatible_filename_path(filename: str, expected: str) -> None:
-    """Test Path object filename compatibility conversion.
-
-    Parameters
-    ----------
-    filename : str
-        Input filename to convert to Path
-    expected : str
-        Expected converted filename
-
-    """
+    """Test Path object filename compatibility conversion."""
     converted = compatible_filename(Path(filename))
     assert isinstance(converted, Path)
     assert converted == Path(expected)
@@ -103,20 +85,7 @@ def test_make_figure_paths_single_ext(
     extension: str,
     expected: str,
 ) -> None:
-    """Test figure path generation with single extension.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extension : str
-        Single file extension
-    expected : str
-        Expected figure path
-
-    """
+    """Test figure path generation with single extension."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -156,20 +125,7 @@ def test_make_figure_paths_multiple_ext(
     extensions: list[str],
     expected: list[str],
 ) -> None:
-    """Test figure path generation with multiple extensions.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extensions : list[str]
-        List of file extensions
-    expected : list[str]
-        Expected figure paths
-
-    """
+    """Test figure path generation with multiple extensions."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -199,20 +155,7 @@ def test_make_figure_paths_remove_duplicates(
     extensions: list[str],
     expected: list[str],
 ) -> None:
-    """Test duplicate extension removal in figure path generation.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extensions : list[str]
-        List of file extensions with duplicates
-    expected : list[str]
-        Expected deduplicated figure paths
-
-    """
+    """Test duplicate extension removal in figure path generation."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -244,22 +187,7 @@ def test_make_figure_paths_separate_dir_by_main_module(
     main_module: bool | str,
     expected: list[str],
 ) -> None:
-    """Test figure path generation with main module directory separation.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extensions : list[str]
-        List of file extensions
-    main_module : bool or str
-        Main module separation flag or name
-    expected : list[str]
-        Expected figure paths with module separation
-
-    """
+    """Test figure path generation with main module directory separation."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -285,20 +213,7 @@ def test_make_figure_paths_separate_dir_by_ext(
     extensions: list[str],
     expected: list[str],
 ) -> None:
-    """Test figure path generation with extension directory separation.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extensions : list[str]
-        List of file extensions
-    expected : list[str]
-        Expected figure paths with extension separation
-
-    """
+    """Test figure path generation with extension directory separation."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -339,24 +254,7 @@ def test_make_figure_paths(
     separate_dir_by_ext: bool,
     expected: list[str],
 ) -> None:
-    """Test comprehensive figure path generation with all options.
-
-    Parameters
-    ----------
-    output_directory : FilePath
-        Directory for output files
-    basename : str
-        Base name for the figure
-    extensions : list[str]
-        List of file extensions
-    main_module : bool or str
-        Main module separation flag or name
-    separate_dir_by_ext : bool
-        Flag for extension directory separation
-    expected : list[str]
-        Expected figure paths
-
-    """
+    """Test comprehensive figure path generation with all options."""
     figure_paths = make_figure_paths(
         output_directory,
         basename,
@@ -381,15 +279,11 @@ def test_make_figure_paths(
     ],
 )
 def test_extract_common_path(paths: list[str | Path], expected: Path) -> None:
-    """Test common path extraction from multiple paths.
-
-    Parameters
-    ----------
-    paths : list[str | Path]
-        List of input paths
-    expected : Path
-        Expected common path
-
-    """
+    """Test common path extraction from multiple paths."""
     result = extract_common_path(*paths)
     assert result == expected
+
+
+# Local Variables:
+# jinx-local-words: "axb basename csv cxx dat dir jpg noqa parametrized pdf plotutil png px pyplotutil pytest str" # noqa: E501
+# End:
