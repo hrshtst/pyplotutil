@@ -628,13 +628,14 @@ wheels = [
 
 [[package]]
 name = "pyplotutil"
-version = "0.4.1.dev23+gd8a8a9a.d20250107"
+version = "0.4.1.dev34+gabaca55.d20250109"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "polars" },
     { name = "pyqt6" },
+    { name = "scienceplots" },
 ]
 
 [package.dev-dependencies]
@@ -654,6 +655,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.0" },
     { name = "polars", specifier = ">=1.17.1" },
     { name = "pyqt6", specifier = ">=6.8.0" },
+    { name = "scienceplots", specifier = ">=2.1.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -816,6 +818,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/43/a9/1676ee9106995381e3d34bccac5bb28df70194167337ed4854c20f27c7ba/ruff-0.8.4-py3-none-win32.whl", hash = "sha256:552fb6d861320958ca5e15f28b20a3d071aa83b93caee33a87b471f99a6c0835", size = 8805621 },
     { url = "https://files.pythonhosted.org/packages/10/98/ed6b56a30ee76771c193ff7ceeaf1d2acc98d33a1a27b8479cbdb5c17a23/ruff-0.8.4-py3-none-win_amd64.whl", hash = "sha256:f21a1143776f8656d7f364bd264a9d60f01b7f52243fbe90e7670c0dfe0cf65d", size = 9660086 },
     { url = "https://files.pythonhosted.org/packages/13/9f/026e18ca7d7766783d779dae5e9c656746c6ede36ef73c6d934aaf4a6dec/ruff-0.8.4-py3-none-win_arm64.whl", hash = "sha256:9183dd615d8df50defa8b1d9a074053891ba39025cf5ae88e8bcb52edcc4bf08", size = 9074500 },
+]
+
+[[package]]
+name = "scienceplots"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/04/aff33daa212cf6dd5427999062aab0289976dd1b0b842752e81ab17aef66/SciencePlots-2.1.1.tar.gz", hash = "sha256:d8d197e3410f87ebdad0b9c265eaab596094fb082d97123e835f6bc32800ab54", size = 10757 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/2a/debffdd7061c7a65ab46c51e671b895dc8231c4a14950849c40699eb2070/SciencePlots-2.1.1-py3-none-any.whl", hash = "sha256:2e64d2e93b4f98702f30145dbb70d238f5dc315e227fec331489631232dfc9e0", size = 16472 },
 ]
 
 [[package]]
