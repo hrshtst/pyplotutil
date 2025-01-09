@@ -230,3 +230,8 @@ class TestFakeLogger:
         assert not logger.is_enabled_for(NOTSET)
         assert not logger.is_enabled_for(42)
         assert not logger.is_enabled_for(13)
+
+
+# Local Variables:
+# jinx-local-words: "loggingutil noqa"
+# End:

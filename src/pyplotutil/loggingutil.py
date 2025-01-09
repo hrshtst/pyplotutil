@@ -746,3 +746,8 @@ def start_logging(
     if not dry_run and output_dir is not None:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
     return start_event_logging(argv, output_dir, name=name, logging_level=logging_level)
+
+
+# Local Variables:
+# jinx-local-words: "TextIO args argv asctime dir evlog fmt getframe kwargs levelname lineno loggingutil msg myapp noqa py pyplotutil pytest stacklevel stderr str sys vv vvv" # noqa: E501
+# End:
