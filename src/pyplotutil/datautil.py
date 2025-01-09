@@ -1256,5 +1256,5 @@ class Dataset:
 
 
 # Local Variables:
-# jinx-local-words: "Iterable Runtime StringIO csv datadict datadir datadirs dataframe datapath datapaths dataset dest dtype ndarray noqa np numpy param polars str timeseries"
+# jinx-local-words: "Iterable Runtime StringIO csv datadict datadir datadirs dataframe datapath datapaths dataset dest dtype ndarray noqa np numpy param polars str timeseries" # noqa: E501
 # End:

@@ -37,16 +37,17 @@ Notes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar, overload
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots  # noqa: F401
 
+from pyplotutil._typing import NoDefault, no_default
 from pyplotutil.loggingutil import evlog
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
@@ -408,6 +409,102 @@ def extract_common_path(*paths: str | Path) -> Path:
     return common_path
 
 
+def _get_limits(
+    xlim: Sequence[float] | None,
+    fallback: tuple[float, float] | None,
+    fallback_xlim: tuple[float, float] | None,
+) -> tuple[float, float] | None:
+    """Calculate axis limits based on input sequence and fallback values.
+
+    Parameters
+    ----------
+    xlim : Sequence[float] | None
+        Input sequence of values to determine limits from
+    fallback : tuple[float, float] | None
+        Default fallback limits to use if xlim is empty
+    fallback_xlim : tuple[float, float] | None
+        Secondary fallback limits that override primary fallback
+
+    Returns
+    -------
+    tuple[float, float] | None
+        Calculated axis limits as (min, max) tuple, or None if xlim is None
+
+    """
+    if xlim is None:
+        return None
+
+    fixed_xlim: tuple[float, float] | None = None
+    if len(xlim) == 0:
+        if fallback is not None:
+            fixed_xlim = fallback
+        if fallback_xlim is not None:
+            fixed_xlim = fallback_xlim
+    elif len(xlim) == 1:
+        fixed_xlim = (-abs(xlim[0]), abs(xlim[0]))
+    else:
+        fixed_xlim = (min(xlim), max(xlim))
+    return fixed_xlim
+
+
+@overload
+def get_limits(
+    xlim: Sequence[float] | None,
+    ylim: Sequence[float] | None,
+    *,
+    fallback: tuple[float, float] | None = None,
+    fallback_xlim: tuple[float, float] | None = None,
+    fallback_ylim: tuple[float, float] | None = None,
+) -> tuple[tuple[float, float] | None, tuple[float, float] | None]: ...
+
+
+@overload
+def get_limits(
+    xlim: Sequence[float] | None,
+    ylim: NoDefault = no_default,
+    *,
+    fallback: tuple[float, float] | None = None,
+    fallback_xlim: tuple[float, float] | None = None,
+    fallback_ylim: tuple[float, float] | None = None,
+) -> tuple[float, float] | None: ...
+
+
+def get_limits(
+    xlim: Sequence[float] | None,
+    ylim: Sequence[float] | None | NoDefault = no_default,
+    *,
+    fallback: tuple[float, float] | None = None,
+    fallback_xlim: tuple[float, float] | None = None,
+    fallback_ylim: tuple[float, float] | None = None,
+) -> tuple[float, float] | None | tuple[tuple[float, float] | None, tuple[float, float] | None]:
+    """Calculate axis limits for one or two dimensions.
+
+    Parameters
+    ----------
+    xlim : Sequence[float] | None
+        Input sequence for x-axis limits
+    ylim : Sequence[float] | None | NoDefault, optional
+        Input sequence for y-axis limits
+    fallback : tuple[float, float] | None, optional
+        Default fallback limits for both axes
+    fallback_xlim : tuple[float, float] | None, optional
+        Specific fallback limits for x-axis
+    fallback_ylim : tuple[float, float] | None, optional
+        Specific fallback limits for y-axis
+
+    Returns
+    -------
+    tuple[float, float] | None | tuple[tuple[float, float] | None, tuple[float, float] | None]
+        Single axis limits or tuple of (x_limits, y_limits)
+
+    """
+    fixed_xlim = _get_limits(xlim, fallback, fallback_xlim)
+    if ylim is no_default:
+        return fixed_xlim
+    fixed_ylim = _get_limits(ylim, fallback, fallback_ylim)
+    return fixed_xlim, fixed_ylim
+
+
 def get_tlim_mask(t: np.ndarray, tlim: tuple[float, float] | None) -> np.ndarray:
     """Create a boolean mask for time limits.
 
@@ -706,5 +803,5 @@ def fill_between_err(
 
 
 # Local Variables:
-# jinx-local-words: "Colormap FilePathT Iterable Jupyter LaTeX arg basename bbox ci cjk cmap csv customizable dataset ddof dir facecolor fmt ieee jp linspace lw matplotlib ndarray noqa np plt png randn sd se str timepoints timeseries tlim" # noqa: E501
+# jinx-local-words: "Colormap FilePathT Iterable Jupyter LaTeX arg basename bbox ci cjk cmap csv customizable dataset ddof dir facecolor fmt ieee jp linspace lw matplotlib ndarray noqa np plt png randn sd se str timepoints timeseries tlim xlim ylim" # noqa: E501
 # End:

@@ -21,10 +21,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyplotutil.plotutil import compatible_filename, extract_common_path, make_figure_paths
+from pyplotutil.plotutil import compatible_filename, extract_common_path, get_limits, make_figure_paths
 from tests.test_datautil import DATA_DIR_PATH
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pyplotutil._typing import FilePath
 
 
@@ -284,6 +286,91 @@ def test_extract_common_path(paths: list[str | Path], expected: Path) -> None:
     assert result == expected
 
 
+@pytest.mark.parametrize(
+    ("xlim", "fallback", "fallback_xlim", "expected"),
+    [
+        (None, None, None, None),
+        (None, (0.1, 0.2), None, None),
+        (None, None, (0.3, 0.4), None),
+        (None, (0.1, 0.2), (0.3, 0.4), None),
+        ([], None, None, None),
+        ([], (0.1, 0.2), None, (0.1, 0.2)),
+        ([], None, (0.3, 0.4), (0.3, 0.4)),
+        ([], (0.5, 0.6), (0.7, 0.8), (0.7, 0.8)),
+        ([1.0], None, None, (-1.0, 1.0)),
+        ([2.0], (0.1, 0.2), None, (-2.0, 2.0)),
+        ([-3.0], None, (0.3, 0.4), (-3.0, 3.0)),
+        ([-4.0], (0.5, 0.6), (0.7, 0.8), (-4.0, 4.0)),
+        ((1.0, 2.0), None, None, (1.0, 2.0)),
+        ((4.0, 3.0), (0.1, 0.2), None, (3.0, 4.0)),
+        ((5.0, -6.0), None, (0.3, 0.4), (-6.0, 5.0)),
+        ([-7.0, 8.0], (0.5, 0.6), (0.7, 0.8), (-7.0, 8.0)),
+        ((1.0, 2.0, 3.0), None, None, (1.0, 3.0)),
+        ((5.0, 4.0, 7.0, 6.0), (0.1, 0.2), None, (4.0, 7.0)),
+        ([7.0, -8.0, 9.0], None, (0.3, 0.4), (-8.0, 9.0)),
+        (range(10), (0.5, 0.6), (0.7, 0.8), (0, 9)),
+    ],
+)
+def test_get_limits_xlim(
+    xlim: Sequence[float] | None,
+    fallback: tuple[float, float] | None,
+    fallback_xlim: tuple[float, float] | None,
+    expected: tuple[float, float] | None,
+) -> None:
+    """Test get_limits function with x-axis limits only."""
+    fixed_xlim = get_limits(xlim, fallback=fallback, fallback_xlim=fallback_xlim)
+    assert fixed_xlim == expected
+
+
+@pytest.mark.parametrize(
+    ("xlim", "ylim", "fallback", "fallback_xlim", "fallback_ylim", "expected"),
+    [
+        (None, None, None, None, None, (None, None)),
+        (None, [], (0.1, 0.2), None, None, (None, (0.1, 0.2))),
+        (None, [], None, None, (0.3, 0.4), (None, (0.3, 0.4))),
+        (None, [], (0.1, 0.2), None, (0.3, 0.4), (None, (0.3, 0.4))),
+        (None, (1.0, 2.0), (0.1, 0.2), None, None, (None, (1.0, 2.0))),
+        (None, (1.0, -2.0), None, None, (0.3, 0.4), (None, (-2.0, 1.0))),
+        (None, [-1.0, -2.0], (0.1, 0.2), None, (0.3, 0.4), (None, (-2.0, -1.0))),
+        (None, (1.0, 2.0, 3.0), (0.1, 0.2), None, None, (None, (1.0, 3.0))),
+        (None, [1.0, -2.0, 3.0], None, None, (0.3, 0.4), (None, (-2.0, 3.0))),
+        (None, (-1.0, 2.0, -3.0), (0.1, 0.2), None, (0.3, 0.4), (None, (-3.0, 2.0))),
+        ([], [], (0.1, 0.2), None, None, ((0.1, 0.2), (0.1, 0.2))),
+        ([], [], None, (0.3, 0.4), None, ((0.3, 0.4), None)),
+        ([], [], None, None, (0.5, 0.6), (None, (0.5, 0.6))),
+        ([], [], (0.1, 0.2), (0.3, 0.4), None, ((0.3, 0.4), (0.1, 0.2))),
+        ([], [], (0.1, 0.2), None, (0.3, 0.4), ((0.1, 0.2), (0.3, 0.4))),
+        ([], [], None, (0.1, 0.2), (0.3, 0.4), ((0.1, 0.2), (0.3, 0.4))),
+        ([], [], (0.1, 0.2), (0.3, 0.4), (0.5, 0.6), ((0.3, 0.4), (0.5, 0.6))),
+        ([1.0], [2.0], (0.1, 0.2), None, None, ((-1.0, 1.0), (-2.0, 2.0))),
+        ([3.0, -3.0], [4.0, -4.0], None, (0.3, 0.4), None, ((-3.0, 3.0), (-4.0, 4.0))),
+        ((1.0, 2.0, 3.0), (4.0, 5.0, 6.0), None, None, (0.5, 0.6), ((1.0, 3.0), (4.0, 6.0))),
+        ([1.0, -2.0, 3.0], [-4.0, 5.0, -6.0], (0.1, 0.2), (0.3, 0.4), None, ((-2.0, 3.0), (-6.0, 5.0))),
+        ([1.0, -2.0], [3.0], (0.1, 0.2), None, (0.3, 0.4), ((-2.0, 1.0), (-3.0, 3.0))),
+        ((-1.0, 2.0, 3.0), [4.0], None, (0.1, 0.2), (0.3, 0.4), ((-1.0, 3.0), (-4.0, 4.0))),
+        (range(5), range(10), (0.1, 0.2), (0.3, 0.4), (0.5, 0.6), ((0, 4), (0, 9))),
+    ],
+)
+def test_get_limits(
+    xlim: Sequence[float] | None,
+    ylim: Sequence[float] | None,
+    fallback: tuple[float, float] | None,
+    fallback_xlim: tuple[float, float] | None,
+    fallback_ylim: tuple[float, float] | None,
+    expected: tuple[tuple[float, float] | None, tuple[float, float] | None],
+) -> None:
+    """Test get_limits function with both x and y axis limits."""
+    fixed_xlim, fixed_ylim = get_limits(
+        xlim,
+        ylim,
+        fallback=fallback,
+        fallback_xlim=fallback_xlim,
+        fallback_ylim=fallback_ylim,
+    )
+    assert fixed_xlim == expected[0]
+    assert fixed_ylim == expected[1]
+
+
 # Local Variables:
-# jinx-local-words: "axb basename csv cxx dat dir jpg noqa parametrized pdf plotutil png px pyplotutil pytest str" # noqa: E501
+# jinx-local-words: "axb basename csv cxx dat dir jpg noqa parametrized pdf plotutil png px pyplotutil pytest str xlim ylim" # noqa: E501
 # End:
