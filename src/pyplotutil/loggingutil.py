@@ -647,6 +647,24 @@ def evlog() -> logging.Logger | FakeLogger:
     return event_logger()
 
 
+def get_event_logger_filename() -> Path | None:
+    """Retrieve Path object of log file when the event logger is started.
+
+    Returns
+    -------
+    Path or None
+        Path object of log file, or None when the event logger is not started.
+
+    """
+    logger = event_logger()
+    if isinstance(logger, FakeLogger):
+        return None
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            return Path(handler.baseFilename)
+    return None
+
+
 def get_logging_level_from_verbose_count(verbose_count: int) -> str:
     """Convert verbosity count to logging level string.
 
