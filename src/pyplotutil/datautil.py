@@ -864,28 +864,39 @@ class TaggedData(BaseData):
         return self.datadict.get(tag, default)
 
     @overload
-    def param(self, tag: str, key: int | str) -> float: ...
+    def param(self, key: int | str, tag: str | None = None) -> float: ...
 
     @overload
-    def param(self, tag: str, key: Sequence) -> tuple[float, ...]: ...
+    def param(self, key: Sequence, tag: str | None = None) -> tuple[float, ...]: ...
 
-    def param(self, tag, key):
+    def param(self, key, tag=None):
         """Retrieve specific parameter(s) for column(s) from a tagged Data object.
 
         Parameters
         ----------
-        tag : str
-            Tag of the data group to retrieve.
-
         key : int or str or Sequence of int or str
             The column(s) for which to retrieve the parameter.
+        tag : str or None, optional
+            Tag of the data group to retrieve, by default None. If None is given, the first tag is
+            used.
 
         Returns
         -------
         float or tuple[float, ...]
             Retrieved parameter value(s).
 
+        Raises
+        ------
+        RuntimeError
+            If no tagged data is stored.
+
         """
+        if tag is None:
+            try:
+                tag = sorted(self.tags())[0]
+            except IndexError as e:
+                msg = "No tagged data is stored."
+                raise RuntimeError(msg) from e
         return self.get(tag).param(key)
 
     def __str__(self) -> str:
@@ -1245,5 +1256,5 @@ class Dataset:
 
 
 # Local Variables:
-# jinx-local-words: "Iterable StringIO csv datadict datadir datadirs dataframe datapath datapaths dataset dest dtype ndarray noqa np numpy param polars str timeseries" # noqa: E501
+# jinx-local-words: "Iterable Runtime StringIO csv datadict datadir datadirs dataframe datapath datapaths dataset dest dtype ndarray noqa np numpy param polars str timeseries"
 # End:

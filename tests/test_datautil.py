@@ -738,7 +738,7 @@ def test_tagged_data_get_default_none(default_tagged_data: TaggedData, tagged_da
 )
 def test_tagged_data_param(default_tagged_data: TaggedData, tag: str, col: str, expected: float) -> None:
     """Test parameter retrieval from a tagged group."""
-    param = default_tagged_data.param(tag, col)
+    param = default_tagged_data.param(col, tag)
     assert param == expected
     assert isinstance(param, float)
 
@@ -758,12 +758,14 @@ def test_tagged_data_param_list(
     expected: list[float],
 ) -> None:
     """Test parameter retrieval for multiple columns from a tagged group."""
-    assert default_tagged_data.param(tag, cols) == expected
+    params = default_tagged_data.param(cols, tag)
+    assert params == expected
+    assert all(isinstance(param, float) for param in params)
 
 
 def test_tagged_data_param_list_unpack(default_tagged_data: TaggedData) -> None:
     """Test unpacking multiple column parameters from a tagged group."""
-    a, b, c = default_tagged_data.param("tag01", ["a", "b", "c"])
+    a, b, c = default_tagged_data.param(["a", "b", "c"], "tag01")
     expected_values = (0, 1, 2)
     assert a == expected_values[0]
     assert b == expected_values[1]
@@ -771,6 +773,32 @@ def test_tagged_data_param_list_unpack(default_tagged_data: TaggedData) -> None:
     assert isinstance(a, float)
     assert isinstance(b, float)
     assert isinstance(c, float)
+
+
+@pytest.mark.parametrize(
+    ("cols", "expected"),
+    [
+        (["a", "b"], (0, 1)),
+        (["c", "a"], (2, 0)),
+        (["a", "b", "c"], (0, 1, 2)),
+    ],
+)
+def test_tagged_data_param_no_tag(
+    default_tagged_data: TaggedData,
+    cols: list[str],
+    expected: list[float],
+) -> None:
+    """Test parameter retrieval without tag specification from a tagged group."""
+    params = default_tagged_data.param(cols)
+    assert params == expected
+    assert all(isinstance(param, float) for param in params)
+
+
+def test_tagged_data_param_no_tag_error() -> None:
+    """Test if an exception is raised when no data is stored in a tagged group."""
+    tagged_data = TaggedData(StringIO("tag,a,b,c,d,e\n"))
+    with pytest.raises(RuntimeError, match="No tagged data is stored."):
+        _ = tagged_data.param(["a", "b", "c"])
 
 
 def sample_data_files(tmp_path: Path = DATA_DIR_PATH) -> tuple[Path, ...]:
