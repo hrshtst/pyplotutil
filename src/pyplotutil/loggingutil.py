@@ -702,7 +702,7 @@ def get_logging_level_from_verbose_count(verbose_count: int) -> str:
 
 def start_logging(
     argv: list[str],
-    output_dir: str | Path,
+    output_dir: str | Path | None,
     name: str,
     verbose_count: int,
     *,
@@ -718,7 +718,7 @@ def start_logging(
     ----------
     argv : list[str]
         Command line arguments used for log file naming
-    output_dir : Path
+    output_dir : Path or None
         Directory where log files will be stored
     name : str
         Name for the logger instance
@@ -743,6 +743,6 @@ def start_logging(
 
     """
     logging_level = get_logging_level_from_verbose_count(verbose_count)
-    if not dry_run:
+    if not dry_run and output_dir is not None:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
     return start_event_logging(argv, output_dir, name=name, logging_level=logging_level)
