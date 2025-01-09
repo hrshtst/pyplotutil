@@ -59,7 +59,6 @@ from pyplotutil._typing import (
     MultiColSelector,
     MultiIndexSelector,
     NoDefault,
-    NumericType,
     SingleColSelector,
     SingleIndexSelector,
     Unknown,
@@ -553,13 +552,13 @@ class Data(BaseData):
         return Data(df1), Data(df2)
 
     @overload
-    def param(self, key: int | str) -> NumericType: ...
+    def param(self, key: int | str) -> float: ...
 
     @overload
-    def param(self, key: Sequence) -> tuple[NumericType, ...]: ...
+    def param(self, key: Sequence) -> tuple[float, ...]: ...
 
     def param(self, key):
-        """Retrieve specific parameter(s) for column(s).
+        """Retrieve specific parameter(s) for column(s) as float.
 
         Parameters
         ----------
@@ -568,14 +567,14 @@ class Data(BaseData):
 
         Returns
         -------
-        Numeric type or pl.Series
+        float or tuple[float, ...]
             Retrieved parameter value(s).
 
         """
         subset = self.dataframe[:, key]
         if isinstance(subset, pl.Series):
-            return subset[0]
-        return subset.row(0)
+            return subset.cast(pl.Float64)[0]
+        return subset.cast(pl.Float64).row(0)
 
     def _copy_datapath_if_loaded_from_file(self, dest_data: Data) -> Data:
         """Copy datapath from source to destination Data object if source was loaded from file.
@@ -865,10 +864,10 @@ class TaggedData(BaseData):
         return self.datadict.get(tag, default)
 
     @overload
-    def param(self, tag: str, key: int | str) -> NumericType: ...
+    def param(self, tag: str, key: int | str) -> float: ...
 
     @overload
-    def param(self, tag: str, key: Sequence) -> tuple[NumericType, ...]: ...
+    def param(self, tag: str, key: Sequence) -> tuple[float, ...]: ...
 
     def param(self, tag, key):
         """Retrieve specific parameter(s) for column(s) from a tagged Data object.
@@ -879,12 +878,12 @@ class TaggedData(BaseData):
             Tag of the data group to retrieve.
 
         key : int or str or Sequence of int or str
-            The column(s) for which to compute the parameter.
+            The column(s) for which to retrieve the parameter.
 
         Returns
         -------
-        Numeric type or pl.Series
-            Computed parameter value(s).
+        float or tuple[float, ...]
+            Retrieved parameter value(s).
 
         """
         return self.get(tag).param(key)

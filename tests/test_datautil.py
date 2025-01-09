@@ -458,7 +458,9 @@ def test_data_max_list(default_data: Data, cols: list[str], expected: list[float
 )
 def test_data_param(default_data: Data, col: str, expected: float) -> None:
     """Test parameter retrieval for a specified column."""
-    assert default_data.param(col) == expected
+    param = default_data.param(col)
+    assert param == expected
+    assert isinstance(param, float)
 
 
 @pytest.mark.parametrize(
@@ -469,7 +471,9 @@ def test_data_param(default_data: Data, col: str, expected: float) -> None:
 )
 def test_data_param_list(default_data: Data, cols: list[str], expected: list[float]) -> None:
     """Test parameter retrieval from multiple columns."""
-    assert default_data.param(cols) == expected
+    params = default_data.param(cols)
+    assert params == expected
+    assert all(isinstance(param, float) for param in params)
 
 
 def test_data_clone(default_data: Data) -> None:
@@ -734,7 +738,9 @@ def test_tagged_data_get_default_none(default_tagged_data: TaggedData, tagged_da
 )
 def test_tagged_data_param(default_tagged_data: TaggedData, tag: str, col: str, expected: float) -> None:
     """Test parameter retrieval from a tagged group."""
-    assert default_tagged_data.param(tag, col) == expected
+    param = default_tagged_data.param(tag, col)
+    assert param == expected
+    assert isinstance(param, float)
 
 
 @pytest.mark.parametrize(
@@ -762,6 +768,9 @@ def test_tagged_data_param_list_unpack(default_tagged_data: TaggedData) -> None:
     assert a == expected_values[0]
     assert b == expected_values[1]
     assert c == expected_values[2]
+    assert isinstance(a, float)
+    assert isinstance(b, float)
+    assert isinstance(c, float)
 
 
 def sample_data_files(tmp_path: Path = DATA_DIR_PATH) -> tuple[Path, ...]:
