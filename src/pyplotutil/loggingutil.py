@@ -110,8 +110,7 @@ else:
 
 
 def check_level(level: int | str) -> int:
-    """
-    Convert logging level string or int to corresponding integer level.
+    """Convert logging level string or int to corresponding integer level.
 
     Parameters
     ----------
@@ -145,8 +144,7 @@ def check_level(level: int | str) -> int:
 
 
 class FakeLogger:
-    """
-    Mock logger implementing standard logging interface.
+    """Mock logger implementing standard logging interface.
 
     Provides logging functionality that mimics Python's standard Logger class, with output directed
     to a specified stream.
@@ -169,8 +167,7 @@ class FakeLogger:
     terminator: str = "\n"
 
     def __init__(self, level: int | str = NOTSET, stream: TextIO | None = None, *, disable: bool = False) -> None:
-        """
-        Initialize FakeLogger with specified level and output stream.
+        """Initialize FakeLogger with specified level and output stream.
 
         Parameters
         ----------
@@ -188,8 +185,7 @@ class FakeLogger:
         self._disabled = disable
 
     def set_level(self, level: int | str) -> None:
-        """
-        Set the logging level threshold.
+        """Set the logging level threshold.
 
         Parameters
         ----------
@@ -200,8 +196,7 @@ class FakeLogger:
         self._level = check_level(level)
 
     def setLevel(self, level: int | str) -> None:  # noqa: N802
-        """
-        Legacy-style alias for set_level.
+        """Legacy-style alias for set_level.
 
         Parameters
         ----------
@@ -212,8 +207,7 @@ class FakeLogger:
         return self.set_level(level)
 
     def is_enabled_for(self, level: int) -> bool:
-        """
-        Check if logger will process messages at given level.
+        """Check if logger will process messages at given level.
 
         Parameters
         ----------
@@ -231,8 +225,7 @@ class FakeLogger:
         return level >= self.level
 
     def find_caller(self, *, stack_info: bool = False, stacklevel: int = 1) -> tuple[str, int, str, str | None]:
-        """
-        Identify the module and line number where logging was called.
+        """Identify the module and line number where logging was called.
 
         Parameters
         ----------
@@ -278,8 +271,7 @@ class FakeLogger:
         stack_info: bool = False,
         stacklevel: int = 1,
     ) -> None:
-        """
-        Core logging method that handles message creation and routing.
+        """Core logging method that handles message creation and routing.
 
         Parameters
         ----------
@@ -299,8 +291,7 @@ class FakeLogger:
         self.handle(record)
 
     def handle(self, record: logging.LogRecord) -> None:
-        """
-        Process a LogRecord by emitting it.
+        """Process a LogRecord by emitting it.
 
         Parameters
         ----------
@@ -316,8 +307,7 @@ class FakeLogger:
             self._stream.flush()
 
     def emit(self, record: logging.LogRecord) -> None:
-        """
-        Write formatted LogRecord to output stream.
+        """Write formatted LogRecord to output stream.
 
         Parameters
         ----------
@@ -330,8 +320,7 @@ class FakeLogger:
         self.flush()
 
     def set_formatter(self, fmt: logging.Formatter) -> None:
-        """
-        Set the formatter for log messages.
+        """Set the formatter for log messages.
 
         Parameters
         ----------
@@ -342,8 +331,7 @@ class FakeLogger:
         self._formatter = fmt
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Apply formatter to LogRecord.
+        """Apply formatter to LogRecord.
 
         Parameters
         ----------
@@ -359,8 +347,7 @@ class FakeLogger:
         return self._formatter.format(record)
 
     def debug(self, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at DEBUG level.
+        """Log message at DEBUG level.
 
         Parameters
         ----------
@@ -376,8 +363,7 @@ class FakeLogger:
             self._log(DEBUG, msg, args, **kwargs)
 
     def info(self, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at INFO level.
+        """Log message at INFO level.
 
         Parameters
         ----------
@@ -393,8 +379,7 @@ class FakeLogger:
             self._log(INFO, msg, args, **kwargs)
 
     def warning(self, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at WARNING level.
+        """Log message at WARNING level.
 
         Parameters
         ----------
@@ -410,8 +395,7 @@ class FakeLogger:
             self._log(WARNING, msg, args, **kwargs)
 
     def error(self, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at ERROR level.
+        """Log message at ERROR level.
 
         Parameters
         ----------
@@ -427,8 +411,7 @@ class FakeLogger:
             self._log(ERROR, msg, args, **kwargs)
 
     def critical(self, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at CRITICAL level.
+        """Log message at CRITICAL level.
 
         Parameters
         ----------
@@ -444,8 +427,7 @@ class FakeLogger:
             self._log(CRITICAL, msg, args, **kwargs)
 
     def log(self, level: int, msg: str, *args: object, **kwargs: Unknown) -> None:
-        """
-        Log message at specified level.
+        """Log message at specified level.
 
         Parameters
         ----------
@@ -463,8 +445,7 @@ class FakeLogger:
             self._log(level, msg, args, **kwargs)
 
     def toggle(self, *, disabled: bool | None = None) -> bool:
-        """
-        Toggle or set logger's disabled state.
+        """Toggle or set logger's disabled state.
 
         Parameters
         ----------
@@ -485,8 +466,7 @@ class FakeLogger:
 
     @property
     def level(self) -> int:
-        """
-        Get current logging level.
+        """Get current logging level.
 
         Returns
         -------
@@ -498,8 +478,7 @@ class FakeLogger:
 
     @property
     def disabled(self) -> bool:
-        """
-        Get logger's disabled state.
+        """Get logger's disabled state.
 
         Returns
         -------
@@ -513,8 +492,7 @@ class FakeLogger:
 
 
 def _running_in_pytest() -> bool:
-    """
-    Check if the code is running inside pytest.
+    """Check if the code is running inside pytest.
 
     Returns
     -------
@@ -533,8 +511,7 @@ def _get_default_event_log_filename(
     output_dir: str | Path | None,
     given_log_filename: str | Path | None,
 ) -> Path:
-    """
-    Get the default event log filename.
+    """Get the default event log filename.
 
     Parameters
     ----------
@@ -572,8 +549,7 @@ def start_event_logging(
     logging_level_file: int | str = logging.DEBUG,
     fmt: str | None = None,
 ) -> logging.Logger:
-    """
-    Configure and start event logging system.
+    """Configure and start event logging system.
 
     Sets up both console and file handlers with specified logging levels.
 
@@ -648,8 +624,7 @@ def start_event_logging(
 
 
 def event_logger() -> logging.Logger | FakeLogger:
-    """
-    Get the global event logger instance.
+    """Get the global event logger instance.
 
     Returns
     -------
@@ -661,8 +636,7 @@ def event_logger() -> logging.Logger | FakeLogger:
 
 
 def evlog() -> logging.Logger | FakeLogger:
-    """
-    Alias for getting the global event logger instance.
+    """Alias for getting the global event logger instance.
 
     Returns
     -------
@@ -674,8 +648,7 @@ def evlog() -> logging.Logger | FakeLogger:
 
 
 def get_logging_level_from_verbose_count(verbose_count: int) -> str:
-    """
-    Convert verbosity count to logging level string.
+    """Convert verbosity count to logging level string.
 
     Parameters
     ----------
@@ -708,8 +681,7 @@ def start_logging(
     *,
     dry_run: bool = False,
 ) -> logging.Logger:
-    """
-    Initialize logging system with verbosity control and output configuration.
+    """Initialize logging system with verbosity control and output configuration.
 
     Sets up a complete logging system with both file and console handlers based on the specified
     verbosity level. Creates output directory if it doesn't exist (unless in dry-run mode).
