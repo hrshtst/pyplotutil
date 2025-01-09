@@ -1,1 +1,3 @@
-"""__init__.py"""
+"""Example scripts."""
+
+from __future__ import annotations
