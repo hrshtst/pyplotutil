@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scienceplots  # noqa: F401
 
 from pyplotutil.loggingutil import evlog
 
@@ -56,6 +57,149 @@ if TYPE_CHECKING:
 
 
 FilePathT = TypeVar("FilePathT", str, Path)
+
+
+def _style_options(
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> list[str]:
+    """Generate a list of style options based on input parameters.
+
+    Parameters
+    ----------
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    Returns
+    -------
+    list[str]
+        List of style options based on enabled parameters
+
+    """
+    styles: list[str] = []
+    if grid:
+        styles.append("grid")
+    if scatter:
+        styles.append("scatter")
+    if no_latex:
+        styles.append("no-latex")
+    if cjk_jp_font:
+        styles.append("cjk-jp-font")
+    return styles
+
+
+def apply_science_style(
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> None:
+    """Apply science style to matplotlib plots.
+
+    Parameters
+    ----------
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    """
+    styles = ["science"]
+    styles.extend(_style_options(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font))
+    plt.style.use(styles)
+
+
+def apply_ieee_style(
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> None:
+    """Apply IEEE style to matplotlib plots.
+
+    Parameters
+    ----------
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    """
+    styles = ["science", "ieee"]
+    styles.extend(_style_options(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font))
+    plt.style.use(styles)
+    plt.rcParams.update({"figure.dpi": "100"})
+
+
+def apply_nature_style(
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> None:
+    """Apply Nature journal style to matplotlib plots.
+
+    Parameters
+    ----------
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    """
+    styles = ["science", "nature"]
+    styles.extend(_style_options(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font))
+    plt.style.use(styles)
+
+
+def apply_notebook_style(
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> None:
+    """Apply Jupyter notebook style to matplotlib plots.
+
+    Parameters
+    ----------
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    """
+    styles = ["science", "notebook"]
+    styles.extend(_style_options(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font))
+    plt.style.use(styles)
 
 
 def compatible_filename(filename: FilePathT) -> FilePathT:
@@ -562,5 +706,5 @@ def fill_between_err(
 
 
 # Local Variables:
-# jinx-local-words: "Colormap FilePathT Iterable arg basename bbox ci cmap csv customizable dataset ddof dir facecolor fmt linspace lw matplotlib ndarray noqa np plt png randn sd se str timepoints timeseries tlim" # noqa: E501
+# jinx-local-words: "Colormap FilePathT Iterable Jupyter LaTeX arg basename bbox ci cjk cmap csv customizable dataset ddof dir facecolor fmt ieee jp linspace lw matplotlib ndarray noqa np plt png randn sd se str timepoints timeseries tlim" # noqa: E501
 # End:
