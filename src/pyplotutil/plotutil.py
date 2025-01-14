@@ -778,7 +778,7 @@ def fill_between_err(
     tlim: tuple[float, float] | None,
     color: ColorType | None,
     alpha: float | None,
-    interpolation: bool = False,
+    interpolate: bool = False,
     suppress_exception: bool = False,
 ) -> Axes:
     """Fill between error bounds.
@@ -799,8 +799,8 @@ def fill_between_err(
         Fill color.
     alpha : float or None
         Fill transparency.
-    interpolation : bool, optional
-        Whether to use interpolation, by default False.
+    interpolate : bool, optional
+        Whether to use interpolate, by default False.
     suppress_exception : bool, optional
         Whether to suppress exceptions, by default False.
 
@@ -829,7 +829,7 @@ def fill_between_err(
         kwargs["facecolor"] = color
     if alpha is not None:
         kwargs["alpha"] = alpha
-    kwargs["interpolation"] = interpolation
+    kwargs["interpolate"] = interpolate
 
     mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type)
     # Note that fill_between always goes behind lines.
