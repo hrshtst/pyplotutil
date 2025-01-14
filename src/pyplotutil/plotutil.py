@@ -638,7 +638,7 @@ def plot_multi_timeseries(
     color: ColorType | None = None,
     fmt: str | None = None,
     labels: str | Iterable[str] | None = None,
-    cmap_name: str = "tab10",
+    cmap_name: str | None = None,
 ) -> list[Line2D]:
     """Plot multiple time series on the same axes.
 
@@ -660,8 +660,8 @@ def plot_multi_timeseries(
         Format string, by default None.
     labels : str or Iterable[str] or None, optional
         Labels for lines, by default None.
-    cmap_name : str, optional
-        Colormap name, by default "tab10".
+    cmap_name : str or None, optional
+        Colormap name, by default None.
 
     Returns
     -------
@@ -671,7 +671,7 @@ def plot_multi_timeseries(
     """
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
-    cmap = plt.get_cmap(cmap_name)
+    cmap = plt.get_cmap(cmap_name) if cmap_name is not None else None
     if labels is None:
         labels = [f"{i}" for i in range(len(y_arr))]
     elif isinstance(labels, str):
@@ -687,7 +687,7 @@ def plot_multi_timeseries(
     lines: list[Line2D] = []
     for i, (y, label) in enumerate(zip(y_arr, labels, strict=True)):
         kwargs["label"] = str(label)
-        if color is None:
+        if color is None and cmap is not None:
             kwargs["c"] = cmap(i)
 
         if fmt is None:  # noqa: SIM108
