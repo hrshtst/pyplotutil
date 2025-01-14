@@ -1004,6 +1004,28 @@ class Dataset:
         """
         return len(self._dataset)
 
+    def __str__(self) -> str:
+        """Return a string of the grouped mapping of tag to Data.
+
+        Returns
+        -------
+        str
+            String representation of the grouped mapping of tag to Data.
+
+        """
+        return str(self.dataset)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns
+        -------
+        str
+            String representation of the object.
+
+        """
+        return f"{self.__class__.__name__}({self.datadirs})"
+
     def __iter__(self) -> Iterator[Data]:
         """Return an iterator over the Data objects.
 
