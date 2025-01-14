@@ -203,6 +203,44 @@ def apply_notebook_style(
     plt.style.use(styles)
 
 
+def apply_style(
+    style: Literal["science", "ieee", "nature", "notebook"],
+    *,
+    grid: bool = False,
+    scatter: bool = False,
+    no_latex: bool = False,
+    cjk_jp_font: bool = False,
+) -> None:
+    """Apply specific style to matplotlib plots.
+
+    Parameters
+    ----------
+    style: Literal["science", "ieee", "nature", "notebook"]
+        Style name to apply. Choose from "science", "ieee", "nature", "notebook".
+    grid : bool, optional
+        Enable grid style, by default False
+    scatter : bool, optional
+        Enable scatter style, by default False
+    no_latex : bool, optional
+        Disable LaTeX rendering, by default False
+    cjk_jp_font : bool, optional
+        Enable CJK Japanese font support, by default False
+
+    """
+    if style == "science":
+        apply_science_style(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font)
+    elif style == "ieee":
+        apply_ieee_style(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font)
+    elif style == "nature":
+        apply_nature_style(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font)
+    elif style == "notebook":
+        apply_notebook_style(grid=grid, scatter=scatter, no_latex=no_latex, cjk_jp_font=cjk_jp_font)
+    else:
+        msg = f"Unsupported style: {style}"
+        evlog().error(msg)
+        raise ValueError(msg)
+
+
 def compatible_filename(filename: FilePathT) -> FilePathT:
     """Convert filename to a compatible format by replacing special characters.
 
