@@ -19,13 +19,22 @@ dependencies = [
     "pyqt6>=6.8.0",
     "scienceplots>=2.1.1",
 ]
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = []
+keywords = [
+  "matplotlib-figures",
+  "matplotlib-style-sheets",
+  "matplotlib-styles",
+  "python",
+  "scientific-papers",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
+    "Framework :: Matplotlib",
+    "Framework :: Pytest",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -34,7 +43,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
-    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: Utilities",
     "Typing :: Typed",
 ]
@@ -164,6 +173,10 @@ docstring-code-line-length = "dynamic"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "serious",
+]
 
 [tool.pyright]
 include = ["src", "tests", "examples"]
@@ -188,5 +201,5 @@ module = [
 ignore_missing_imports = true
 
 # Local Variables:
-# jinx-local-words: "Hiroshi McCabe Pyflakes addopts args backend bzr cov defs dev direnv doctests hatchling hg ini ipynb isort matplotlib md mixedCase mypy nox numpy polars pycache pycodestyle pydocstyle pyenv pylint pypackages pyplotutil pyright pytest pytype ra reStructuredText rgx scienceplots scipy src svn testpaths tomli tox unfixable untyped urls vcs venv venvPath vscode xdist zA"
+# jinx-local-words: "Hiroshi McCabe Pyflakes addopts args backend bzr cov defs dev direnv doctests hatchling hg ini ipynb isort matplotlib md mixedCase mypy nox numpy polars pycache pycodestyle pydocstyle pyenv pylint pypackages pyplotutil pyright pytest pytype ra reStructuredText rgx scienceplots scipy src svn testpaths tomli tox unfixable untyped urls uv vcs venv venvPath vscode xdist zA"
 # End:
