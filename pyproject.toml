@@ -14,7 +14,7 @@ maintainers = [
 ]
 dependencies = [
     "matplotlib>=3.10.0",
-    "numpy>=2.2.0",
+    "numpy<2.2.0",
     "polars>=1.17.1",
     "pyqt6>=6.8.0",
     "scienceplots>=2.1.1",
