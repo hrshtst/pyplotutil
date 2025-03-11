@@ -824,6 +824,28 @@ class TaggedData(BaseData):
         """
         return self.datadict.items()
 
+    @cached_property
+    def first_tag(self) -> str:
+        """Return the first tag stored in the TaggedData object.
+
+        Returns
+        -------
+        str
+            The first tag after tags in the object are sorted alphabetically.
+
+        Raises
+        ------
+        RuntimeError
+            If no tagged data is stored.
+
+        """
+        try:
+            tag = sorted(self.tags())[0]
+        except IndexError as e:
+            msg = "No tagged data is stored."
+            raise RuntimeError(msg) from e
+        return tag
+
     @overload
     def get(self, tag: str) -> Data: ...
 
@@ -885,18 +907,9 @@ class TaggedData(BaseData):
         float or tuple[float, ...]
             Retrieved parameter value(s).
 
-        Raises
-        ------
-        RuntimeError
-            If no tagged data is stored.
-
         """
         if tag is None:
-            try:
-                tag = sorted(self.tags())[0]
-            except IndexError as e:
-                msg = "No tagged data is stored."
-                raise RuntimeError(msg) from e
+            tag = self.first_tag
         return self.get(tag).param(key)
 
     def __str__(self) -> str:

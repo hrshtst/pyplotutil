@@ -698,6 +698,18 @@ def test_tagged_data_items(default_tagged_data: TaggedData, tagged_dataframe: pl
         assert_frame_equal(data.dataframe, tagged_dataframe.filter(pl.col("tag") == tag).drop("tag"))
 
 
+def test_tagged_data_first_tag(default_tagged_data: TaggedData) -> None:
+    """Test access to the first tag stored in `TaggedData`."""
+    assert default_tagged_data.first_tag == "tag01"
+
+
+def test_tagged_data_first_tag_no_tag_error() -> None:
+    """Test if an exception is raised when no data is stored in a tagged group."""
+    tagged_data = TaggedData(StringIO("tag,a,b,c,d,e\n"))
+    with pytest.raises(RuntimeError, match="No tagged data is stored."):
+        _ = tagged_data.first_tag
+
+
 def test_tagged_data_get(default_tagged_data: TaggedData, tagged_dataframe: pl.DataFrame) -> None:
     """Test retrieval of a data group by tag."""
     for tag in ["tag01", "tag02", "tag03"]:
