@@ -5,7 +5,7 @@ from pathlib import Path
 
 import nox
 
-nox.needs_version = ">=2024.10.9"
+nox.needs_version = ">=2026.7.11"
 nox.options.default_venv_backend = "uv|virtualenv"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.sessions = ["lint", "typecheck", "tests"]
