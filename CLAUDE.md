@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Gotchas
 
-- numpy is pinned `<2.2.0` on Python ≤ 3.13; Python 3.14+ uses `>=2.2.0` (numpy 2.1.x ships no 3.14 wheels). Never relax the ≤ 3.13 pin without running the full test suite.
+- numpy requires `>=2.2.0`. A historical `<2.2.0` pin was confirmed obsolete in July 2026 (full matrix green on numpy 2.2.6/2.5.1) — don't reintroduce it without a reproducible failure.
 - Data handling is built on **polars**, not pandas.
 - The package version comes from git tags via hatch-vcs — do not add a static `version` to pyproject.toml.
 - pytest-randomly randomizes test order, so tests must not depend on execution order.
