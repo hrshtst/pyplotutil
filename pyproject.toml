@@ -14,7 +14,8 @@ maintainers = [
 ]
 dependencies = [
     "matplotlib>=3.10.0",
-    "numpy<2.2.0",
+    "numpy<2.2.0; python_version < '3.14'",
+    "numpy>=2.2.0; python_version >= '3.14'",
     "polars>=1.17.1",
     "pyqt6>=6.8.0",
     "scienceplots>=2.1.1",
@@ -42,6 +43,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: Utilities",
