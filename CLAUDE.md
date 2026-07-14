@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - Package manager is **uv**; run tools through it: `uv run pytest`, `uv run mypy src tests`, `uv run ruff check`.
-- `nox` runs the default sessions (lint + tests across Python 3.10–3.13). Prefer `uv run pytest` for quick iteration.
+- `nox` runs the default sessions (lint, typecheck, tests across Python 3.11–3.14). Prefer `uv run pytest` for quick iteration.
 - Run a single test: `uv run pytest -k 'test_name'`.
 - Run `uv run mypy` before finishing a change (targets `src`, `tests`, and `examples` via config); CI enforces it through `nox -s typecheck`.
 
