@@ -19,9 +19,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
+from matplotlib.figure import Figure
 
-from pyplotutil.plotutil import compatible_filename, extract_common_path, get_limits, make_figure_paths
+from pyplotutil.plotutil import (
+    calculate_mean_err,
+    compatible_filename,
+    extract_common_path,
+    fill_between_err,
+    get_limits,
+    make_figure_paths,
+)
 from tests.test_datautil import DATA_DIR_PATH
 
 if TYPE_CHECKING:
@@ -266,6 +275,30 @@ def test_make_figure_paths(
         separate_dir_by_ext=separate_dir_by_ext,
     )
     assert set(figure_paths) == {Path(e) for e in expected}
+
+
+def test_calculate_mean_err_se_divides_by_trial_count() -> None:
+    """Test that standard error scales the deviation by the number of trials, not time points."""
+    n_trials = 4
+    rng = np.random.default_rng(seed=42)
+    data_array = rng.random((n_trials, 10))
+    mean, err1, err2 = calculate_mean_err(data_array, err_type="se")
+    np.testing.assert_allclose(mean, np.mean(data_array, axis=0))
+    np.testing.assert_allclose(err1, np.std(data_array, axis=0) / np.sqrt(n_trials))
+    assert err2 is None
+
+
+def test_fill_between_err_range_covers_data_extremes() -> None:
+    """Test that the filled band for range errors spans the data minimum to maximum at each time."""
+    t = np.array([1.0, 2.0, 3.0])
+    y_arr = np.array([[1.0, 2.0, 3.0], [3.0, 6.0, 9.0], [2.0, 10.0, 4.0]])
+    ax = Figure().add_subplot()
+    fill_between_err(ax, t, y_arr, "range", tlim=None, color=None, alpha=None)
+    vertices = np.asarray(ax.collections[0].get_paths()[0].vertices)
+    for i, x in enumerate(t):
+        band_y = vertices[np.isclose(vertices[:, 0], x), 1]
+        assert band_y.min() == pytest.approx(y_arr[:, i].min())
+        assert band_y.max() == pytest.approx(y_arr[:, i].max())
 
 
 @pytest.mark.parametrize(

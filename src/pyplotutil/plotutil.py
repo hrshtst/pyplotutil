@@ -615,9 +615,9 @@ def calculate_mean_err(
         return mean, lower, upper
 
     if err_type.lower() == "se":
-        # standard error
+        # standard error of the mean: deviation over the number of trials
         std = np.std(data_array, axis=0, ddof=ddof)
-        se = std / np.sqrt(len(std))
+        se = std / np.sqrt(data_array.shape[0])
         return mean, se, None
 
     if err_type.lower() == "ci":
@@ -836,7 +836,8 @@ def fill_between_err(
     if err2 is None:
         ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err1[mask], **kwargs)
     else:
-        ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err2[mask], **kwargs)
+        # err1 is the distance below the mean and err2 the distance above, as in `plot_mean_err`.
+        ax.fill_between(t[mask], mean[mask] - err1[mask], mean[mask] + err2[mask], **kwargs)
     return ax
 
 
