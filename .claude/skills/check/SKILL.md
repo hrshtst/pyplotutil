@@ -7,11 +7,11 @@ Run each step with Bash and report results. Continue through all steps even if a
 
 1. **Lint**: `uv run ruff check`
 2. **Format check**: `uv run ruff format --check`
-3. **Type check**: `uv run mypy src tests`
+3. **Type check**: `uv run mypy`
 4. **Tests**: `uv run pytest`
 
 Then summarize: one line per step (pass/fail), followed by details for any failures.
 
 - If ruff reports fixable issues, offer to run `uv run ruff check --fix` (note: `SIM105` is configured unfixable).
-- mypy failures are expected to be fixed, not ignored — mypy is part of this repo's workflow even though CI does not run it.
+- mypy failures are expected to be fixed, not ignored — CI enforces type checking via `nox -s typecheck`.
 - The test suite uses pytest-randomly; if a failure looks order-dependent, rerun with the printed seed (`-p randomly --randomly-seed=<seed>`) to reproduce.

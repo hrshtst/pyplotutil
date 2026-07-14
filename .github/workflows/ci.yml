@@ -49,6 +49,29 @@ jobs:
       - name: Run lints
         run: nox --non-interactive --error-on-missing-interpreter --session "lint"
 
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Upgrade nox
+        run: |
+          python -m pip install --upgrade 'nox[uv]'
+          nox --version
+
+      - name: Run type check
+        run: nox --non-interactive --error-on-missing-interpreter --session "typecheck"
+
   tests:
     timeout-minutes: 10
     strategy:
@@ -92,5 +115,5 @@ jobs:
         run: nox --non-interactive --error-on-missing-interpreter --session "tests-${{ matrix.python-version }}" -- --full-trace
 
 # Local Variables:
-# jinx-local-words: "ci github macos md nox os ubuntu uv"
+# jinx-local-words: "ci github macos md nox os typecheck ubuntu uv"
 # End:
