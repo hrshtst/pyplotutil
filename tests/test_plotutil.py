@@ -183,6 +183,7 @@ def test_make_figure_paths_remove_duplicates(
     ],
 )
 def test_make_figure_paths_separate_dir_by_main_module(
+    *,
     output_directory: FilePath,
     basename: str,
     extensions: list[str],

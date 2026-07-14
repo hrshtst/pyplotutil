@@ -706,7 +706,7 @@ def test_tagged_data_first_tag(default_tagged_data: TaggedData) -> None:
 def test_tagged_data_first_tag_no_tag_error() -> None:
     """Test if an exception is raised when no data is stored in a tagged group."""
     tagged_data = TaggedData(StringIO("tag,a,b,c,d,e\n"))
-    with pytest.raises(RuntimeError, match="No tagged data is stored."):
+    with pytest.raises(RuntimeError, match=r"No tagged data is stored\."):
         _ = tagged_data.first_tag
 
 
@@ -809,7 +809,7 @@ def test_tagged_data_param_no_tag(
 def test_tagged_data_param_no_tag_error() -> None:
     """Test if an exception is raised when no data is stored in a tagged group."""
     tagged_data = TaggedData(StringIO("tag,a,b,c,d,e\n"))
-    with pytest.raises(RuntimeError, match="No tagged data is stored."):
+    with pytest.raises(RuntimeError, match=r"No tagged data is stored\."):
         _ = tagged_data.param(["a", "b", "c"])
 
 

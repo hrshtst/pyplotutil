@@ -303,7 +303,7 @@ def make_figure_paths(
         main_module_name = separate_dir_by_main_module
     elif separate_dir_by_main_module:
         try:
-            import __main__
+            import __main__  # noqa: PLC0415  # must resolve the running script at call time
 
             main_module_name = Path(__main__.__file__).stem
         except ImportError:
@@ -603,24 +603,24 @@ def calculate_mean_err(
         std = np.std(data_array, axis=0, ddof=ddof)
         return mean, std, None
 
-    if err_type.lower() in ("var",):
+    if err_type.lower() == "var":
         # variance
         var = np.var(data_array, axis=0, ddof=ddof)
         return mean, var, None
 
-    if err_type.lower() in ("range",):
+    if err_type.lower() == "range":
         # range
         lower = mean - np.min(data_array, axis=0)
         upper = np.max(data_array, axis=0) - mean
         return mean, lower, upper
 
-    if err_type.lower() in ("se",):
+    if err_type.lower() == "se":
         # standard error
         std = np.std(data_array, axis=0, ddof=ddof)
         se = std / np.sqrt(len(std))
         return mean, se, None
 
-    if err_type.lower() in ("ci",):
+    if err_type.lower() == "ci":
         # confidence interval
         raise NotImplementedError
 

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -128,8 +129,6 @@ def parse() -> argparse.Namespace:
 
 def main() -> None:
     """Run main function."""
-    import sys
-
     args = parse()
     start_logging(sys.argv, args.output_dir, __name__, args.verbose)
     evlog().info("Output directory: %s", args.output_dir)
