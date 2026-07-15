@@ -45,7 +45,7 @@ from pyplotutil.plotutil import (
 from tests.test_datautil import DATA_DIR_PATH
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from pyplotutil._typing import FilePath
 
@@ -288,20 +288,24 @@ def test_make_figure_paths(
     assert set(figure_paths) == {Path(e) for e in expected}
 
 
+IEEE_DPI = 100.0
+NOTEBOOK_FIGSIZE = [8.0, 6.0]
+
+
 @pytest.mark.parametrize(
-    ("style", "rc_key", "rc_value"),
+    ("style", "check"),
     [
-        ("science", "text.usetex", True),
-        ("ieee", "figure.dpi", 100.0),
-        ("nature", "text.usetex", True),
-        ("notebook", "figure.figsize", [8.0, 6.0]),
+        ("science", lambda: plt.rcParams["text.usetex"] is True),
+        ("ieee", lambda: plt.rcParams["figure.dpi"] == IEEE_DPI),
+        ("nature", lambda: plt.rcParams["text.usetex"] is True),
+        ("notebook", lambda: plt.rcParams["figure.figsize"] == NOTEBOOK_FIGSIZE),
     ],
 )
-def test_apply_style(style: str, rc_key: str, rc_value: object) -> None:
-    """Test that each style name updates matplotlib rcParams."""
+def test_apply_style(style: str, check: Callable[[], bool]) -> None:
+    """Test that each style name updates the expected matplotlib rcParams."""
     with mpl.rc_context():
         apply_style(style)  # type: ignore[arg-type]
-        assert plt.rcParams[rc_key] == rc_value
+        assert check()
 
 
 def test_apply_style_options() -> None:
