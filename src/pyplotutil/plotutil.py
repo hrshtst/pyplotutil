@@ -1133,6 +1133,176 @@ def fill_between_err(
     return ax
 
 
+def mask_to_spans(t: np.ndarray, mask: np.ndarray) -> list[tuple[float, float]]:
+    """Return (start, end) pairs of contiguous True runs in a boolean mask.
+
+    Parameters
+    ----------
+    t : np.ndarray
+        One-dimensional array of time values.
+    mask : np.ndarray
+        Boolean array of the same shape as `t`.
+
+    Returns
+    -------
+    list[tuple[float, float]]
+        Start and end time of each contiguous True run. A run of length one yields a span
+        whose start and end coincide.
+
+    Raises
+    ------
+    ValueError
+        If `t` is not one-dimensional or the shapes of `t` and `mask` differ.
+
+    """
+    t = np.asarray(t)
+    mask_arr = np.asarray(mask, dtype=bool)
+    if t.ndim != 1:
+        msg = f"`t` must be one-dimensional: {t.ndim} dimensions given"
+        raise ValueError(msg)
+    if t.shape != mask_arr.shape:
+        msg = f"`t` and `mask` must have the same shape: {t.shape}, {mask_arr.shape}"
+        raise ValueError(msg)
+    padded = np.concatenate(([False], mask_arr, [False]))
+    edges = np.where(padded[:-1] != padded[1:])[0]
+    starts = edges[0::2]
+    ends = edges[1::2] - 1
+    return [(float(t[i]), float(t[j])) for i, j in zip(starts, ends, strict=True)]
+
+
+def shade_spans(
+    ax: Axes,
+    t: np.ndarray,
+    mask: np.ndarray,
+    *,
+    color: ColorType | None = None,
+    alpha: float | None = 0.2,
+    **kwargs: Unknown,
+) -> Axes:
+    """Shade vertical spans wherever a boolean mask is True.
+
+    Draws one `axvspan` per contiguous True run in `mask`, e.g. to highlight phases,
+    events, or regimes in a time series plot.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    t : np.ndarray
+        One-dimensional array of time values.
+    mask : np.ndarray
+        Boolean array of the same shape as `t` selecting the time points to shade.
+    color : ColorType or None, optional
+        Fill color of the spans, by default None (matplotlib default).
+    alpha : float or None, optional
+        Fill transparency, by default 0.2.
+    **kwargs : Unknown
+        Additional keyword arguments passed to `Axes.axvspan`.
+
+    Returns
+    -------
+    Axes
+        The modified axes object.
+
+    """
+    if color is not None:
+        kwargs["color"] = color
+    if alpha is not None:
+        kwargs["alpha"] = alpha
+    for start, end in mask_to_spans(t, mask):
+        ax.axvspan(start, end, **kwargs)
+    return ax
+
+
+def _set_grid(ax: Axes, *, grid: bool | Literal["both", "x", "y"]) -> None:
+    """Enable or disable the grid on the given axes.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    grid : bool or {"both", "x", "y"}
+        True or an axis name enables the grid on that axis; False disables it.
+
+    """
+    if grid:
+        axis = grid if isinstance(grid, str) else "both"
+        ax.grid(visible=True, axis=axis)
+    else:
+        ax.grid(visible=False)
+
+
+def setup_axes(
+    ax: Axes,
+    *,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    title: str | None = None,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+    grid: bool | Literal["both", "x", "y"] | None = None,
+    legend: bool | str = False,
+    legend_ncols: int = 1,
+    legend_framealpha: float = 0.8,
+) -> Axes:
+    """Configure axes cosmetics in one call.
+
+    Every option defaults to leaving the corresponding setting untouched, so the function
+    only applies what is passed.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    xlabel : str or None, optional
+        Label of the x axis, by default None.
+    ylabel : str or None, optional
+        Label of the y axis, by default None.
+    title : str or None, optional
+        Title of the axes, by default None.
+    xlim : tuple[float, float] or None, optional
+        Limits of the x axis, by default None.
+    ylim : tuple[float, float] or None, optional
+        Limits of the y axis, by default None.
+    grid : bool or {"both", "x", "y"} or None, optional
+        True or an axis name enables the grid on that axis, False disables it, and None
+        (the default) leaves it untouched.
+    legend : bool or str, optional
+        True shows a legend at the best location, a string shows it at that location,
+        by default False.
+    legend_ncols : int, optional
+        Number of legend columns, by default 1.
+    legend_framealpha : float, optional
+        Transparency of the legend frame, by default 0.8.
+
+    Returns
+    -------
+    Axes
+        The configured axes object.
+
+    """
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
+    if title is not None:
+        ax.set_title(title)
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    if grid is not None:
+        _set_grid(ax, grid=grid)
+    if legend:
+        legend_kwargs: dict[str, Unknown] = {
+            "loc": legend if isinstance(legend, str) else "best",
+            "ncols": legend_ncols,
+            "framealpha": legend_framealpha,
+        }
+        ax.legend(**legend_kwargs)
+    return ax
+
+
 def annotate_with_arrow(
     ax: Axes,
     text: str,

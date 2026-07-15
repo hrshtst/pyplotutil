@@ -21,6 +21,8 @@ publications.
   `science`, `ieee`, `nature`, `notebook`
 - Annotate plotted lines with boxed labels and arrows
   (`annotate_with_arrow`)
+- Highlight time spans from boolean masks (`shade_spans`) and
+  configure axes cosmetics in one call (`setup_axes`)
 - Save figures to multiple formats in one call with sanitized
   filenames
 - Event logging helpers with file and console output

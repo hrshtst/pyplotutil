@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 
 from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.plotutil import (
@@ -41,9 +42,12 @@ from pyplotutil.plotutil import (
     get_limits,
     get_tlim_mask,
     make_figure_paths,
+    mask_to_spans,
     plot_mean_err,
     plot_multi_timeseries,
     save_figure,
+    setup_axes,
+    shade_spans,
 )
 from tests.test_datautil import DATA_DIR_PATH
 
@@ -606,6 +610,152 @@ class TestFillBetweenErr:
             band_y = vertices[np.isclose(vertices[:, 0], x), 1]
             assert band_y.min() == pytest.approx(mean[i] - std[i])
             assert band_y.max() == pytest.approx(mean[i] + std[i])
+
+
+class TestMaskToSpans:
+    """A class collecting tests for `mask_to_spans`."""
+
+    t = np.arange(10.0)
+
+    def test_two_runs(self) -> None:
+        """Test extraction of two separate True runs."""
+        mask = np.array([False, False, True, True, True, False, False, True, True, False])
+        assert mask_to_spans(self.t, mask) == [(2.0, 4.0), (7.0, 8.0)]
+
+    def test_runs_touching_edges(self) -> None:
+        """Test runs that start at the first and end at the last element."""
+        mask = np.array([True, True, False, False, False, False, False, False, True, True])
+        assert mask_to_spans(self.t, mask) == [(0.0, 1.0), (8.0, 9.0)]
+
+    def test_all_true(self) -> None:
+        """Test a mask that is True everywhere."""
+        assert mask_to_spans(self.t, np.ones(10, dtype=bool)) == [(0.0, 9.0)]
+
+    def test_all_false(self) -> None:
+        """Test a mask that is False everywhere."""
+        assert mask_to_spans(self.t, np.zeros(10, dtype=bool)) == []
+
+    def test_single_point_run(self) -> None:
+        """Test that a run of length one yields a zero-width span."""
+        mask = np.zeros(10, dtype=bool)
+        mask[3] = True
+        assert mask_to_spans(self.t, mask) == [(3.0, 3.0)]
+
+    def test_shape_mismatch(self) -> None:
+        """Test that differing shapes raise ValueError."""
+        with pytest.raises(ValueError, match="must have the same shape"):
+            mask_to_spans(self.t, np.ones(5, dtype=bool))
+
+    def test_multi_dimensional_t(self) -> None:
+        """Test that a two-dimensional t raises ValueError."""
+        with pytest.raises(ValueError, match="must be one-dimensional"):
+            mask_to_spans(np.zeros((2, 5)), np.ones((2, 5), dtype=bool))
+
+
+class TestShadeSpans:
+    """A class collecting tests for `shade_spans`."""
+
+    t = np.arange(10.0)
+    mask = np.array([False, False, True, True, True, False, False, True, True, False])
+
+    def test_one_patch_per_run(self) -> None:
+        """Test that each True run is shaded with one span of matching extent."""
+        ax = Figure().add_subplot()
+        result = shade_spans(ax, self.t, self.mask)
+        n_runs = 2
+        assert result is ax
+        assert len(ax.patches) == n_runs
+        spans: list[tuple[float, float]] = []
+        for patch in ax.patches:
+            assert isinstance(patch, Rectangle)
+            bbox = patch.get_bbox()
+            spans.append((bbox.x0, bbox.x1))
+        assert spans == [(2.0, 4.0), (7.0, 8.0)]
+
+    def test_color_and_alpha(self) -> None:
+        """Test that the fill color and transparency are applied."""
+        ax = Figure().add_subplot()
+        shade_spans(ax, self.t, self.mask, color="C2", alpha=0.4)
+        expected = mpl.colors.to_rgba("C2", alpha=0.4)
+        assert ax.patches[0].get_facecolor() == pytest.approx(expected)
+
+    def test_kwargs_passthrough(self) -> None:
+        """Test that extra keyword arguments reach axvspan."""
+        ax = Figure().add_subplot()
+        zorder = -5
+        shade_spans(ax, self.t, self.mask, zorder=zorder)
+        assert ax.patches[0].get_zorder() == zorder
+
+    def test_empty_mask_adds_nothing(self) -> None:
+        """Test that an all-False mask draws no spans."""
+        ax = Figure().add_subplot()
+        shade_spans(ax, self.t, np.zeros(10, dtype=bool))
+        assert len(ax.patches) == 0
+
+
+class TestSetupAxes:
+    """A class collecting tests for `setup_axes`."""
+
+    def test_labels_title_and_limits(self) -> None:
+        """Test that labels, title, and axis limits are applied."""
+        ax = Figure().add_subplot()
+        result = setup_axes(
+            ax,
+            xlabel="time [s]",
+            ylabel="position [m]",
+            title="hop",
+            xlim=(0.0, 10.0),
+            ylim=(-1.0, 1.0),
+        )
+        assert result is ax
+        assert ax.get_xlabel() == "time [s]"
+        assert ax.get_ylabel() == "position [m]"
+        assert ax.get_title() == "hop"
+        assert ax.get_xlim() == (0.0, 10.0)
+        assert ax.get_ylim() == (-1.0, 1.0)
+
+    def test_defaults_leave_axes_untouched(self) -> None:
+        """Test that omitted options do not modify existing settings."""
+        ax = Figure().add_subplot()
+        ax.set_xlabel("keep me")
+        ax.set_xlim(3.0, 4.0)
+        setup_axes(ax, ylabel="new")
+        assert ax.get_xlabel() == "keep me"
+        assert ax.get_xlim() == (3.0, 4.0)
+        assert ax.get_ylabel() == "new"
+
+    @pytest.mark.parametrize(
+        ("grid", "x_visible", "y_visible"),
+        [
+            (True, True, True),
+            ("both", True, True),
+            ("x", True, False),
+            ("y", False, True),
+            (False, False, False),
+        ],
+    )
+    def test_grid(self, *, grid: bool | str, x_visible: bool, y_visible: bool) -> None:
+        """Test grid visibility control per axis."""
+        ax = Figure().add_subplot()
+        setup_axes(ax, grid=grid)  # type: ignore[arg-type]
+        assert ax.xaxis.get_gridlines()[0].get_visible() is x_visible
+        assert ax.yaxis.get_gridlines()[0].get_visible() is y_visible
+
+    def test_legend(self) -> None:
+        """Test that a legend is created with the requested frame transparency."""
+        ax = Figure().add_subplot()
+        ax.plot([0.0, 1.0], [0.0, 1.0], label="line")
+        setup_axes(ax, legend=True, legend_framealpha=0.5)
+        legend = ax.get_legend()
+        assert legend is not None
+        assert legend.get_frame().get_alpha() == pytest.approx(0.5)
+
+    def test_no_legend_by_default(self) -> None:
+        """Test that no legend is created unless requested."""
+        ax = Figure().add_subplot()
+        ax.plot([0.0, 1.0], [0.0, 1.0], label="line")
+        setup_axes(ax)
+        assert ax.get_legend() is None
 
 
 class TestAnnotateWithArrow:

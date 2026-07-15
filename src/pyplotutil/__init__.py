@@ -29,9 +29,12 @@ from pyplotutil.plotutil import (
     get_limits,
     get_tlim_mask,
     make_figure_paths,
+    mask_to_spans,
     plot_mean_err,
     plot_multi_timeseries,
     save_figure,
+    setup_axes,
+    shade_spans,
 )
 
 try:
@@ -64,9 +67,12 @@ __all__ = [
     "get_logging_level_from_verbose_count",
     "get_tlim_mask",
     "make_figure_paths",
+    "mask_to_spans",
     "plot_mean_err",
     "plot_multi_timeseries",
     "save_figure",
+    "setup_axes",
+    "shade_spans",
     "start_event_logging",
     "start_logging",
 ]
