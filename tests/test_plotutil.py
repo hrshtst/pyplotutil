@@ -32,6 +32,7 @@ from matplotlib.figure import Figure
 
 from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.plotutil import (
+    annotate_with_arrow,
     apply_style,
     calculate_mean_err,
     compatible_filename,
@@ -605,6 +606,93 @@ class TestFillBetweenErr:
             band_y = vertices[np.isclose(vertices[:, 0], x), 1]
             assert band_y.min() == pytest.approx(mean[i] - std[i])
             assert band_y.max() == pytest.approx(mean[i] + std[i])
+
+
+class TestAnnotateWithArrow:
+    """A class collecting tests for `annotate_with_arrow`."""
+
+    def test_positions(self) -> None:
+        """Test that the arrow points at xy and the label sits at the offset in points."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(ax, r"$z$", (1.0, 2.0), (30.0, -6.0))
+        assert annotation.get_text() == r"$z$"
+        assert annotation.xy == (1.0, 2.0)
+        assert annotation.xyann == (30.0, -6.0)
+        assert annotation.anncoords == "offset points"
+
+    def test_colors_default_to_shared_color(self) -> None:
+        """Test that the arrow, box edge, and text share the color by default."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(ax, "z", (0.0, 0.0), (10.0, 10.0), color="C1")
+        expected = mpl.colors.to_rgba("C1")
+        assert mpl.colors.to_rgba(annotation.get_color()) == expected
+        assert annotation.arrow_patch is not None
+        assert annotation.arrow_patch.get_edgecolor() == expected
+        bbox_patch = annotation.get_bbox_patch()
+        assert bbox_patch is not None
+        assert bbox_patch.get_edgecolor() == expected
+        assert bbox_patch.get_facecolor() == mpl.colors.to_rgba("white")
+
+    def test_separate_text_and_face_colors(self) -> None:
+        """Test that the text and box background colors can differ from the shared color."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(
+            ax,
+            "z",
+            (0.0, 0.0),
+            (10.0, 10.0),
+            color="C0",
+            text_color="black",
+            face_color="yellow",
+        )
+        assert mpl.colors.to_rgba(annotation.get_color()) == mpl.colors.to_rgba("black")
+        bbox_patch = annotation.get_bbox_patch()
+        assert bbox_patch is not None
+        assert bbox_patch.get_facecolor() == mpl.colors.to_rgba("yellow")
+        assert bbox_patch.get_edgecolor() == mpl.colors.to_rgba("C0")
+
+    def test_line_width_and_pad(self) -> None:
+        """Test that the line width and box margin are applied to box and arrow."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(ax, "z", (0.0, 0.0), (10.0, 10.0), lw=1.2, pad=0.05)
+        bbox_patch = annotation.get_bbox_patch()
+        assert bbox_patch is not None
+        assert bbox_patch.get_linewidth() == pytest.approx(1.2)
+        assert bbox_patch.get_boxstyle().pad == pytest.approx(0.05)  # type: ignore[attr-defined]
+        assert annotation.arrow_patch is not None
+        assert annotation.arrow_patch.get_linewidth() == pytest.approx(1.2)
+
+    def test_fontsize_and_alignment_defaults(self) -> None:
+        """Test the font size setting and the default text alignment."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(ax, "z", (0.0, 0.0), (10.0, 10.0), fontsize=12)
+        assert annotation.get_fontsize() == pytest.approx(12)
+        assert annotation.get_horizontalalignment() == "center"
+        assert annotation.get_verticalalignment() == "bottom"
+
+    def test_alignment_override(self) -> None:
+        """Test that extra keyword arguments reach Axes.annotate."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(ax, "z", (0.0, 0.0), (10.0, 10.0), ha="left", va="top")
+        assert annotation.get_horizontalalignment() == "left"
+        assert annotation.get_verticalalignment() == "top"
+
+    def test_relpos_and_shrink(self) -> None:
+        """Test that the arrow tail position and shrink gaps are forwarded."""
+        ax = Figure().add_subplot()
+        annotation = annotate_with_arrow(
+            ax,
+            "z",
+            (0.0, 0.0),
+            (10.0, 10.0),
+            relpos=(1.0, 0.5),
+            shrink_a=0.2,
+            shrink_b=1.5,
+        )
+        assert annotation.arrowprops is not None
+        assert annotation.arrowprops["relpos"] == (1.0, 0.5)
+        assert annotation.arrowprops["shrinkA"] == pytest.approx(0.2)
+        assert annotation.arrowprops["shrinkB"] == pytest.approx(1.5)
 
 
 class TestSaveFigure:

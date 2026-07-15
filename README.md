@@ -19,6 +19,8 @@ publications.
 - Apply publication-ready matplotlib styles
   ([SciencePlots](https://github.com/garrettj403/SciencePlots)):
   `science`, `ieee`, `nature`, `notebook`
+- Annotate plotted lines with boxed labels and arrows
+  (`annotate_with_arrow`)
 - Save figures to multiple formats in one call with sanitized
   filenames
 - Event logging helpers with file and console output

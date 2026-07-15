@@ -16,6 +16,7 @@ from pyplotutil.loggingutil import (
     start_logging,
 )
 from pyplotutil.plotutil import (
+    annotate_with_arrow,
     apply_ieee_style,
     apply_nature_style,
     apply_notebook_style,
@@ -45,6 +46,7 @@ __all__ = [
     "FakeLogger",
     "TaggedData",
     "__version__",
+    "annotate_with_arrow",
     "apply_ieee_style",
     "apply_nature_style",
     "apply_notebook_style",

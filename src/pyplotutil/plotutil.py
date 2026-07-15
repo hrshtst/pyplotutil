@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from matplotlib.lines import Line2D
+    from matplotlib.text import Annotation
     from matplotlib.typing import ColorType
 
     from pyplotutil._typing import FilePath, Unknown
@@ -1130,6 +1131,99 @@ def fill_between_err(
         # err1 is the distance below the mean and err2 the distance above, as in `plot_mean_err`.
         ax.fill_between(t[mask], mean[mask] - err1[mask], mean[mask] + err2[mask], **kwargs)
     return ax
+
+
+def annotate_with_arrow(
+    ax: Axes,
+    text: str,
+    xy: tuple[float, float],
+    offset: tuple[float, float],
+    *,
+    fontsize: float | str | None = None,
+    relpos: tuple[float, float] = (0.5, 0.5),
+    pad: float = 0.15,
+    lw: float = 0.6,
+    color: ColorType = "black",
+    text_color: ColorType | None = None,
+    face_color: ColorType = "white",
+    boxstyle: str = "square",
+    arrowstyle: str = "->",
+    shrink_a: float = 0.0,
+    shrink_b: float = 0.8,
+    **kwargs: Unknown,
+) -> Annotation:
+    """Annotate a plotted point with a boxed label and an arrow pointing at it.
+
+    The label is placed at an offset in points from the annotated point, so its distance from
+    the point is independent of the data scale.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    text : str
+        Label text.
+    xy : tuple[float, float]
+        Point the arrow points at, in data coordinates.
+    offset : tuple[float, float]
+        Position of the label relative to `xy`, in points.
+    fontsize : float or str or None, optional
+        Font size of the label text, by default None (matplotlib default).
+    relpos : tuple[float, float], optional
+        Starting position of the arrow relative to the label box, by default (0.5, 0.5).
+        (0, 0) is the lower left corner and (1, 1) is the upper right corner.
+    pad : float, optional
+        Margin inside the label box in fractions of the font size, by default 0.15.
+    lw : float, optional
+        Line width of the arrow and the label box edge, by default 0.6. Use 0 to hide the
+        box edge.
+    color : ColorType, optional
+        Color of the arrow and the label box edge, by default "black".
+    text_color : ColorType or None, optional
+        Color of the label text, by default None, which follows `color`.
+    face_color : ColorType, optional
+        Background color of the label box, by default "white".
+    boxstyle : str, optional
+        Box style name of the label box, by default "square".
+    arrowstyle : str, optional
+        Arrow style name, by default "->".
+    shrink_a : float, optional
+        Gap between the label box and the arrow tail in points, by default 0.0.
+    shrink_b : float, optional
+        Gap between the arrow head and the annotated point in points, by default 0.8.
+    **kwargs : Unknown
+        Additional keyword arguments passed to `Axes.annotate`, e.g. `ha` (default "center")
+        and `va` (default "bottom").
+
+    Returns
+    -------
+    Annotation
+        The created annotation.
+
+    """
+    bbox = {"boxstyle": f"{boxstyle},pad={pad}", "fc": face_color, "ec": color, "lw": lw}
+    arrowprops = {
+        "arrowstyle": arrowstyle,
+        "relpos": relpos,
+        "shrinkA": shrink_a,
+        "shrinkB": shrink_b,
+        "lw": lw,
+        "color": color,
+    }
+    kwargs.setdefault("ha", "center")
+    kwargs.setdefault("va", "bottom")
+    if fontsize is not None:
+        kwargs["fontsize"] = fontsize
+    return ax.annotate(
+        text,
+        xy=xy,
+        xytext=offset,
+        textcoords="offset points",
+        color=text_color if text_color is not None else color,
+        bbox=bbox,
+        arrowprops=arrowprops,
+        **kwargs,
+    )
 
 
 # Local Variables:
