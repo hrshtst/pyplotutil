@@ -369,10 +369,41 @@ class TestCalculateMeanErr:
         assert err2 is not None
         np.testing.assert_allclose(err2, np.max(self.data_array, axis=0) - mean)
 
-    def test_ci_not_implemented(self) -> None:
-        """Test that confidence intervals are not implemented yet."""
-        with pytest.raises(NotImplementedError):
-            calculate_mean_err(self.data_array, err_type="ci")
+    # Student's t critical values for the two-sided 95% and 99% levels with two degrees
+    # of freedom (three trials).
+    T_CRIT_95_DF2 = 4.302653
+    T_CRIT_99_DF2 = 9.924843
+
+    def test_ci(self) -> None:
+        """Test that the confidence interval scales the standard error by the t critical value."""
+        mean, err1, err2 = calculate_mean_err(self.data_array, err_type="ci")
+        np.testing.assert_allclose(mean, np.mean(self.data_array, axis=0))
+        se = np.std(self.data_array, axis=0) / np.sqrt(self.data_array.shape[0])
+        np.testing.assert_allclose(err1, self.T_CRIT_95_DF2 * se, rtol=1e-6)
+        assert err2 is None
+
+    def test_ci_confidence_level(self) -> None:
+        """Test that the confidence level changes the critical value."""
+        _, err1, _ = calculate_mean_err(self.data_array, err_type="ci", confidence=0.99)
+        se = np.std(self.data_array, axis=0) / np.sqrt(self.data_array.shape[0])
+        np.testing.assert_allclose(err1, self.T_CRIT_99_DF2 * se, rtol=1e-6)
+
+    def test_ci_ddof(self) -> None:
+        """Test that ddof is applied to the deviation underlying the confidence interval."""
+        _, err1, _ = calculate_mean_err(self.data_array, err_type="ci", ddof=1)
+        se = np.std(self.data_array, axis=0, ddof=1) / np.sqrt(self.data_array.shape[0])
+        np.testing.assert_allclose(err1, self.T_CRIT_95_DF2 * se, rtol=1e-6)
+
+    @pytest.mark.parametrize("confidence", [0.0, 1.0, -0.5, 1.5])
+    def test_ci_invalid_confidence(self, confidence: float) -> None:
+        """Test that a confidence level outside (0, 1) raises ValueError."""
+        with pytest.raises(ValueError, match="`confidence` must be between 0 and 1"):
+            calculate_mean_err(self.data_array, err_type="ci", confidence=confidence)
+
+    def test_ci_requires_two_trials(self) -> None:
+        """Test that a confidence interval with a single trial raises ValueError."""
+        with pytest.raises(ValueError, match="requires at least 2 trials"):
+            calculate_mean_err(np.array([[1.0, 2.0]]), err_type="ci")
 
     def test_unrecognized_err_type(self) -> None:
         """Test that an unknown error type raises ValueError."""

@@ -7,7 +7,7 @@ Key Features
 -----------
 - Save figures with multiple file formats
 - Plot multiple time series with customizable styles
-- Error visualization (standard deviation, variance, range, standard error)
+- Error visualization (standard deviation, variance, range, standard error, confidence interval)
 - Path handling utilities for figure organization
 
 Examples
@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Literal, TypeVar, overload
 import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots  # noqa: F401
+from scipy import stats
 
 from pyplotutil._typing import NoDefault, no_default
 from pyplotutil.loggingutil import evlog
@@ -566,6 +567,7 @@ def calculate_mean_err(
     data_array: np.ndarray,
     err_type: str = "std",
     ddof: int = 0,
+    confidence: float = 0.95,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     """Calculate mean and error metrics for data array.
 
@@ -576,7 +578,10 @@ def calculate_mean_err(
     err_type : str, optional
         Type of error to calculate ("std", "var", "range", "se", "ci"), by default "std".
     ddof : int, optional
-        Delta degrees of freedom, by default 0.
+        Delta degrees of freedom, by default 0. For confidence intervals the sample standard
+        deviation (ddof=1) is conventional.
+    confidence : float, optional
+        Confidence level used when err_type is "ci", by default 0.95.
 
     Returns
     -------
@@ -588,9 +593,8 @@ def calculate_mean_err(
     TypeError
         If err_type is not a string.
     ValueError
-        If err_type is not recognized.
-    NotImplementedError
-        If err_type is "ci".
+        If err_type is not recognized, if confidence is not between 0 and 1, or if a confidence
+        interval is requested with fewer than two trials.
 
     """
     if not isinstance(err_type, str):
@@ -621,8 +625,19 @@ def calculate_mean_err(
         return mean, se, None
 
     if err_type.lower() == "ci":
-        # confidence interval
-        raise NotImplementedError
+        # confidence interval of the mean, scaled by a Student's t critical value
+        if not 0.0 < confidence < 1.0:
+            msg = f"`confidence` must be between 0 and 1 exclusive: {confidence}"
+            raise ValueError(msg)
+        n_trials = data_array.shape[0]
+        min_trials = 2
+        if n_trials < min_trials:
+            msg = f"confidence interval requires at least {min_trials} trials: {n_trials}"
+            raise ValueError(msg)
+        std = np.std(data_array, axis=0, ddof=ddof)
+        se = std / np.sqrt(n_trials)
+        t_crit = float(stats.t.ppf(0.5 + 0.5 * confidence, df=n_trials - 1))
+        return mean, t_crit * se, None
 
     msg = f"unrecognized error type: {err_type}"
     raise ValueError(msg)

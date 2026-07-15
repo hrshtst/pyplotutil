@@ -13,7 +13,7 @@ publications.
 - Group rows by a tag column (`TaggedData`) or manage whole
   directories of data files (`Dataset`)
 - Plot multiple time series and mean-with-error graphs (standard
-  deviation, standard error, variance, range)
+  deviation, standard error, variance, range, confidence interval)
 - Apply publication-ready matplotlib styles
   ([SciencePlots](https://github.com/garrettj403/SciencePlots)):
   `science`, `ieee`, `nature`, `notebook`
