@@ -615,8 +615,12 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "polars" },
-    { name = "pyqt6" },
     { name = "scienceplots" },
+]
+
+[package.optional-dependencies]
+gui = [
+    { name = "pyqt6" },
 ]
 
 [package.dev-dependencies]
@@ -635,9 +639,10 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "numpy", specifier = ">=2.2.0" },
     { name = "polars", specifier = ">=1.17.1" },
-    { name = "pyqt6", specifier = ">=6.8.0" },
+    { name = "pyqt6", marker = "extra == 'gui'", specifier = ">=6.8.0" },
     { name = "scienceplots", specifier = ">=2.1.1" },
 ]
+provides-extras = ["gui"]
 
 [package.metadata.requires-dev]
 dev = [
