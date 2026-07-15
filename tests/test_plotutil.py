@@ -20,6 +20,7 @@ The tests use parametrized fixtures to verify multiple input scenarios and edge 
 
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,6 +30,7 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
+from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.plotutil import (
     apply_style,
     calculate_mean_err,
@@ -490,6 +492,85 @@ class TestPlotMeanErr:
         line = plot_mean_err(ax, self.t, self.y_arr, "range", tlim=None, lw=1, capsize=None, color="C1")
         np.testing.assert_allclose(np.asarray(line.get_ydata()), np.mean(self.y_arr, axis=0))
         assert len(ax.containers) == 1
+
+    def test_confidence_is_forwarded(self) -> None:
+        """Test that the confidence level reaches the error calculation."""
+        ax = Figure().add_subplot()
+        plot_mean_err(ax, self.t, self.y_arr, "ci", confidence=0.99)
+        barlinecols = ax.containers[0][2][0]
+        mean = np.mean(self.y_arr, axis=0)
+        se = np.std(self.y_arr, axis=0) / np.sqrt(self.y_arr.shape[0])
+        expected = TestCalculateMeanErr.T_CRIT_99_DF2 * se
+        for i, segment in enumerate(barlinecols.get_segments()):
+            assert segment[:, 1].min() == pytest.approx(mean[i] - expected[i], rel=1e-6)
+            assert segment[:, 1].max() == pytest.approx(mean[i] + expected[i], rel=1e-6)
+
+
+@pytest.fixture
+def sample_dataset(tmp_path: Path) -> Dataset:
+    """Create a Dataset of three CSV files where column a of file i equals t + i."""
+    for i in range(3):
+        rows = "\n".join(f"{t},{t + i}" for t in range(5))
+        (tmp_path / f"data{i}.csv").write_text(f"t,a\n{rows}\n")
+    return Dataset(tmp_path)
+
+
+class TestPlotFromDataset:
+    """A class collecting tests for plotting directly from a Dataset."""
+
+    def test_plot_multi_timeseries(self, sample_dataset: Dataset) -> None:
+        """Test that a Dataset plots one line per data file, labeled by file stem."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, sample_dataset, "a")
+        assert [line.get_label() for line in lines] == ["data0", "data1", "data2"]
+        for i, line in enumerate(lines):
+            np.testing.assert_allclose(np.asarray(line.get_ydata()), np.arange(5) + i)
+
+    def test_plot_multi_timeseries_t_shift(self, sample_dataset: Dataset) -> None:
+        """Test that the time shift moves the x values of every line."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, sample_dataset, "a", t_shift=1.0)
+        np.testing.assert_allclose(np.asarray(lines[0].get_xdata()), np.arange(5) - 1.0)
+
+    def test_plot_mean_err(self, sample_dataset: Dataset) -> None:
+        """Test that the mean across data files is plotted with error bars."""
+        ax = Figure().add_subplot()
+        line = plot_mean_err(ax, sample_dataset, "a", "std", label="mean")
+        np.testing.assert_allclose(np.asarray(line.get_ydata()), np.arange(5) + 1.0)
+        assert len(ax.containers) == 1
+        assert ax.containers[0].get_label() == "mean"
+
+    def test_fill_between_err(self, sample_dataset: Dataset) -> None:
+        """Test that the range band spans the per-file extremes of the column."""
+        ax = Figure().add_subplot()
+        fill_between_err(ax, sample_dataset, "a", "range")
+        vertices = np.asarray(ax.collections[0].get_paths()[0].vertices)
+        for x in range(5):
+            band_y = vertices[np.isclose(vertices[:, 0], x), 1]
+            assert band_y.min() == pytest.approx(x)
+            assert band_y.max() == pytest.approx(x + 2)
+
+
+class TestPlotFromTaggedData:
+    """A class collecting tests for plotting directly from a TaggedData."""
+
+    CSV = "tag,t,a\nx,0,1\nx,1,2\ny,0,3\ny,1,5\n"
+
+    def test_one_line_per_tag(self) -> None:
+        """Test that each tag group is plotted as its own labeled line."""
+        tagged = TaggedData(StringIO(self.CSV))
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, tagged, "a")
+        assert [line.get_label() for line in lines] == ["x", "y"]
+        np.testing.assert_allclose(np.asarray(lines[0].get_ydata()), [1.0, 2.0])
+        np.testing.assert_allclose(np.asarray(lines[1].get_ydata()), [3.0, 5.0])
+
+    def test_cmap_assigns_distinct_colors(self) -> None:
+        """Test that a colormap assigns a distinct color per tag."""
+        tagged = TaggedData(StringIO(self.CSV))
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, tagged, "a", cmap_name="viridis")
+        assert lines[0].get_color() != lines[1].get_color()
 
 
 class TestFillBetweenErr:

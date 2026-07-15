@@ -14,6 +14,8 @@ publications.
   directories of data files (`Dataset`)
 - Plot multiple time series and mean-with-error graphs (standard
   deviation, standard error, variance, range, confidence interval)
+- Plot directly from data objects: one line per file for a
+  `Dataset`, one labeled line per tag for `TaggedData`
 - Apply publication-ready matplotlib styles
   ([SciencePlots](https://github.com/garrettj403/SciencePlots)):
   `science`, `ieee`, `nature`, `notebook`
@@ -53,8 +55,7 @@ ax.plot(data.t, data.position)
 
 # Load every CSV file in a directory and plot mean with standard error.
 dataset = Dataset("results/")
-t, y = dataset.get_timeseries("position")
-plot_mean_err(ax, t, y, "se", tlim=None, lw=1, capsize=2, label="mean")
+plot_mean_err(ax, dataset, "position", "se", capsize=2, label="mean")
 
 # Write figure.png and figure.pdf in one call.
 save_figure(fig, "output", "figure", ["png", "pdf"])

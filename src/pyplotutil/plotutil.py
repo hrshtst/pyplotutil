@@ -8,6 +8,7 @@ Key Features
 - Save figures with multiple file formats
 - Plot multiple time series with customizable styles
 - Error visualization (standard deviation, variance, range, standard error, confidence interval)
+- Plot directly from Dataset and TaggedData objects
 - Path handling utilities for figure organization
 
 Examples
@@ -45,6 +46,7 @@ import scienceplots  # noqa: F401
 from scipy import stats
 
 from pyplotutil._typing import NoDefault, no_default
+from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.loggingutil import evlog
 
 if TYPE_CHECKING:
@@ -643,40 +645,191 @@ def calculate_mean_err(
     raise ValueError(msg)
 
 
+def _normalize_labels(labels: str | Iterable[str] | None, n_lines: int) -> list[str]:
+    """Return one label per line, expanding a single string with an index suffix.
+
+    Parameters
+    ----------
+    labels : str or Iterable[str] or None
+        Labels for lines. None yields index labels; a single string is expanded per line.
+    n_lines : int
+        Number of lines to label.
+
+    Returns
+    -------
+    list[str]
+        One label per line.
+
+    """
+    if labels is None:
+        return [f"{i}" for i in range(n_lines)]
+    if isinstance(labels, str):
+        return [labels] if n_lines == 1 else [f"{labels}_{i}" for i in range(n_lines)]
+    return [str(label) for label in labels]
+
+
+def _dataset_labels(dataset: Dataset) -> list[str] | None:
+    """Return file stem labels for a dataset, or None when it was not loaded from files.
+
+    Parameters
+    ----------
+    dataset : Dataset
+        Dataset to derive line labels from.
+
+    Returns
+    -------
+    list[str] or None
+        File stems of the data files, or None when unavailable.
+
+    """
+    try:
+        return [path.stem for path in dataset.datapaths]
+    except AttributeError:
+        return None
+
+
+def _plot_tagged_timeseries(
+    ax: Axes,
+    tagged: TaggedData,
+    column: str,
+    *,
+    tlim: tuple[float, float] | None,
+    lw: int | None,
+    color: ColorType | None,
+    fmt: str | None,
+    cmap_name: str | None,
+    t_axis_name: str,
+    t_shift: float,
+) -> list[Line2D]:
+    """Plot one line per tag group of a TaggedData object.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    tagged : TaggedData
+        Tagged data whose groups are plotted as separate lines.
+    column : str
+        Name of the column to plot.
+    tlim : tuple[float, float] or None
+        Time limits.
+    lw : int or None
+        Line width.
+    color : ColorType or None
+        Line color shared by all lines.
+    fmt : str or None
+        Format string.
+    cmap_name : str or None
+        Colormap name used to assign one color per tag.
+    t_axis_name : str
+        Name of the time axis column in each group.
+    t_shift : float
+        Time shift subtracted from the time values.
+
+    Returns
+    -------
+    list[Line2D]
+        List of plotted lines, one per tag in alphabetical order.
+
+    """
+    cmap = plt.get_cmap(cmap_name) if cmap_name is not None else None
+    lines: list[Line2D] = []
+    for i, (tag, data) in enumerate(sorted(tagged.items(), key=lambda item: item[0])):
+        line_color = color
+        if line_color is None and cmap is not None:
+            line_color = cmap(i)
+        t_arr = data[t_axis_name].to_numpy() - t_shift
+        lines.extend(
+            plot_multi_timeseries(
+                ax,
+                t_arr,
+                data[column].to_numpy(),
+                tlim=tlim,
+                lw=lw,
+                color=line_color,
+                fmt=fmt,
+                labels=str(tag),
+            ),
+        )
+    return lines
+
+
+@overload
 def plot_multi_timeseries(
     ax: Axes,
     t: np.ndarray,
     y_arr: np.ndarray,
     *,
-    tlim: tuple[float, float] | None,
-    lw: int | None,
+    tlim: tuple[float, float] | None = None,
+    lw: int | None = None,
     color: ColorType | None = None,
     fmt: str | None = None,
     labels: str | Iterable[str] | None = None,
     cmap_name: str | None = None,
-) -> list[Line2D]:
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> list[Line2D]: ...
+
+
+@overload
+def plot_multi_timeseries(
+    ax: Axes,
+    t: Dataset | TaggedData,
+    y_arr: str,
+    *,
+    tlim: tuple[float, float] | None = None,
+    lw: int | None = None,
+    color: ColorType | None = None,
+    fmt: str | None = None,
+    labels: str | Iterable[str] | None = None,
+    cmap_name: str | None = None,
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> list[Line2D]: ...
+
+
+def plot_multi_timeseries(
+    ax,
+    t,
+    y_arr,
+    *,
+    tlim=None,
+    lw=None,
+    color=None,
+    fmt=None,
+    labels=None,
+    cmap_name=None,
+    t_axis_name="t",
+    t_shift=0.0,
+):
     """Plot multiple time series on the same axes.
 
     Parameters
     ----------
     ax : Axes
         Matplotlib axes object.
-    t : np.ndarray
-        Array of time values.
-    y_arr : np.ndarray
-        Array of y values.
-    tlim : tuple[float, float] or None
-        Time limits.
-    lw : int or None
-        Line width.
+    t : np.ndarray or Dataset or TaggedData
+        Array of time values, or a data object to plot from directly. A Dataset plots one line
+        per data file; a TaggedData plots one line per tag, labeled by the tag.
+    y_arr : np.ndarray or str
+        Array of y values, or the column name when plotting from a data object.
+    tlim : tuple[float, float] or None, optional
+        Time limits, by default None.
+    lw : int or None, optional
+        Line width, by default None.
     color : ColorType or None, optional
         Line color, by default None.
     fmt : str or None, optional
         Format string, by default None.
     labels : str or Iterable[str] or None, optional
-        Labels for lines, by default None.
+        Labels for lines, by default None. When plotting from a Dataset, file stems are used
+        as fallback labels.
     cmap_name : str or None, optional
         Colormap name, by default None.
+    t_axis_name : str, optional
+        Name of the time axis column, by default "t". Only used with data objects.
+    t_shift : float, optional
+        Time shift subtracted from the time values, by default 0.0. Only used with data objects.
 
     Returns
     -------
@@ -684,13 +837,28 @@ def plot_multi_timeseries(
         List of plotted lines.
 
     """
+    if isinstance(t, TaggedData):
+        return _plot_tagged_timeseries(
+            ax,
+            t,
+            y_arr,
+            tlim=tlim,
+            lw=lw,
+            color=color,
+            fmt=fmt,
+            cmap_name=cmap_name,
+            t_axis_name=t_axis_name,
+            t_shift=t_shift,
+        )
+    if isinstance(t, Dataset):
+        if labels is None:
+            labels = _dataset_labels(t)
+        t, y_arr = t.get_timeseries(y_arr, t_shift=t_shift, t_axis_name=t_axis_name)
+
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
     cmap = plt.get_cmap(cmap_name) if cmap_name is not None else None
-    if labels is None:
-        labels = [f"{i}" for i in range(len(y_arr))]
-    elif isinstance(labels, str):
-        labels = [labels] if len(y_arr) == 1 else [f"{labels}_{i}" for i in range(len(y_arr))]
+    labels = _normalize_labels(labels, len(y_arr))
 
     kwargs: dict[str, Unknown] = {}
     if lw is not None:
@@ -701,7 +869,7 @@ def plot_multi_timeseries(
     t_mask = t[mask]
     lines: list[Line2D] = []
     for i, (y, label) in enumerate(zip(y_arr, labels, strict=True)):
-        kwargs["label"] = str(label)
+        kwargs["label"] = label
         if color is None and cmap is not None:
             kwargs["c"] = cmap(i)
 
@@ -713,43 +881,95 @@ def plot_multi_timeseries(
     return lines
 
 
+@overload
 def plot_mean_err(
     ax: Axes,
     t: np.ndarray,
     y_arr: np.ndarray,
-    err_type: str | None,
+    err_type: str | None = "std",
     *,
-    tlim: tuple[float, float] | None,
-    lw: int | None,
-    capsize: int | None,
+    tlim: tuple[float, float] | None = None,
+    lw: int | None = None,
+    capsize: int | None = None,
     color: ColorType | None = None,
     fmt: str | None = None,
     label: str | None = None,
-) -> Line2D:
+    ddof: int = 0,
+    confidence: float = 0.95,
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> Line2D: ...
+
+
+@overload
+def plot_mean_err(
+    ax: Axes,
+    t: Dataset,
+    y_arr: str,
+    err_type: str | None = "std",
+    *,
+    tlim: tuple[float, float] | None = None,
+    lw: int | None = None,
+    capsize: int | None = None,
+    color: ColorType | None = None,
+    fmt: str | None = None,
+    label: str | None = None,
+    ddof: int = 0,
+    confidence: float = 0.95,
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> Line2D: ...
+
+
+def plot_mean_err(
+    ax,
+    t,
+    y_arr,
+    err_type="std",
+    *,
+    tlim=None,
+    lw=None,
+    capsize=None,
+    color=None,
+    fmt=None,
+    label=None,
+    ddof=0,
+    confidence=0.95,
+    t_axis_name="t",
+    t_shift=0.0,
+):
     """Plot mean with error bars.
 
     Parameters
     ----------
     ax : Axes
         Matplotlib axes object.
-    t : np.ndarray
-        Array of time values.
-    y_arr : np.ndarray
-        Array of y values.
-    err_type : str or None
-        Type of error to plot.
-    tlim : tuple[float, float] or None
-        Time limits.
-    lw : int or None
-        Line width.
-    capsize : int or None
-        Size of error bar caps.
+    t : np.ndarray or Dataset
+        Array of time values, or a Dataset whose column is averaged across data files.
+    y_arr : np.ndarray or str
+        Array of y values, or the column name when plotting from a Dataset.
+    err_type : str or None, optional
+        Type of error to plot, by default "std".
+    tlim : tuple[float, float] or None, optional
+        Time limits, by default None.
+    lw : int or None, optional
+        Line width, by default None.
+    capsize : int or None, optional
+        Size of error bar caps, by default None.
     color : ColorType or None, optional
         Line color, by default None.
     fmt : str or None, optional
         Format string, by default None.
     label : str or None, optional
         Label for the plot, by default None.
+    ddof : int, optional
+        Delta degrees of freedom forwarded to the error calculation, by default 0.
+    confidence : float, optional
+        Confidence level used when err_type is "ci", by default 0.95.
+    t_axis_name : str, optional
+        Name of the time axis column, by default "t". Only used with a Dataset.
+    t_shift : float, optional
+        Time shift subtracted from the time values, by default 0.0. Only used with a Dataset.
 
     Returns
     -------
@@ -757,6 +977,9 @@ def plot_mean_err(
         The plotted line.
 
     """
+    if isinstance(t, Dataset):
+        t, y_arr = t.get_timeseries(y_arr, t_shift=t_shift, t_axis_name=t_axis_name)
+
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
 
@@ -775,7 +998,7 @@ def plot_mean_err(
         mean, _, _ = calculate_mean_err(y_arr)
         lines = plot_multi_timeseries(ax, t, mean, tlim=tlim, lw=lw, color=color, fmt=fmt, labels=label)
     else:
-        mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type)
+        mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type, ddof=ddof, confidence=confidence)
         if err2 is None:
             eb = ax.errorbar(t[mask], mean[mask], yerr=err1[mask], **kwargs)
         else:
@@ -784,40 +1007,90 @@ def plot_mean_err(
     return lines[0]
 
 
+@overload
 def fill_between_err(
     ax: Axes,
     t: np.ndarray,
     y_arr: np.ndarray,
-    err_type: str | None,
+    err_type: str | None = "std",
     *,
-    tlim: tuple[float, float] | None,
-    color: ColorType | None,
-    alpha: float | None,
+    tlim: tuple[float, float] | None = None,
+    color: ColorType | None = None,
+    alpha: float | None = None,
     interpolate: bool = False,
     suppress_exception: bool = False,
-) -> Axes:
+    ddof: int = 0,
+    confidence: float = 0.95,
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> Axes: ...
+
+
+@overload
+def fill_between_err(
+    ax: Axes,
+    t: Dataset,
+    y_arr: str,
+    err_type: str | None = "std",
+    *,
+    tlim: tuple[float, float] | None = None,
+    color: ColorType | None = None,
+    alpha: float | None = None,
+    interpolate: bool = False,
+    suppress_exception: bool = False,
+    ddof: int = 0,
+    confidence: float = 0.95,
+    t_axis_name: str = "t",
+    t_shift: float = 0.0,
+) -> Axes: ...
+
+
+def fill_between_err(
+    ax,
+    t,
+    y_arr,
+    err_type="std",
+    *,
+    tlim=None,
+    color=None,
+    alpha=None,
+    interpolate=False,
+    suppress_exception=False,
+    ddof=0,
+    confidence=0.95,
+    t_axis_name="t",
+    t_shift=0.0,
+):
     """Fill between error bounds.
 
     Parameters
     ----------
     ax : Axes
         Matplotlib axes object.
-    t : np.ndarray
-        Array of time values.
-    y_arr : np.ndarray
-        Array of y values.
-    err_type : str or None
-        Type of error to fill.
-    tlim : tuple[float, float] or None
-        Time limits.
-    color : ColorType or None
-        Fill color.
-    alpha : float or None
-        Fill transparency.
+    t : np.ndarray or Dataset
+        Array of time values, or a Dataset whose column is averaged across data files.
+    y_arr : np.ndarray or str
+        Array of y values, or the column name when plotting from a Dataset.
+    err_type : str or None, optional
+        Type of error to fill, by default "std".
+    tlim : tuple[float, float] or None, optional
+        Time limits, by default None.
+    color : ColorType or None, optional
+        Fill color, by default None.
+    alpha : float or None, optional
+        Fill transparency, by default None.
     interpolate : bool, optional
         Whether to use interpolate, by default False.
     suppress_exception : bool, optional
         Whether to suppress exceptions, by default False.
+    ddof : int, optional
+        Delta degrees of freedom forwarded to the error calculation, by default 0.
+    confidence : float, optional
+        Confidence level used when err_type is "ci", by default 0.95.
+    t_axis_name : str, optional
+        Name of the time axis column, by default "t". Only used with a Dataset.
+    t_shift : float, optional
+        Time shift subtracted from the time values, by default 0.0. Only used with a Dataset.
 
     Returns
     -------
@@ -836,6 +1109,9 @@ def fill_between_err(
         msg = "`err_type` for `fill_between_err` must not be None."
         raise ValueError(msg)
 
+    if isinstance(t, Dataset):
+        t, y_arr = t.get_timeseries(y_arr, t_shift=t_shift, t_axis_name=t_axis_name)
+
     mask = get_tlim_mask(t, tlim)
     y_arr = np.atleast_2d(y_arr)
 
@@ -846,7 +1122,7 @@ def fill_between_err(
         kwargs["alpha"] = alpha
     kwargs["interpolate"] = interpolate
 
-    mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type)
+    mean, err1, err2 = calculate_mean_err(y_arr, err_type=err_type, ddof=ddof, confidence=confidence)
     # Note that fill_between always goes behind lines.
     if err2 is None:
         ax.fill_between(t[mask], mean[mask] + err1[mask], mean[mask] - err1[mask], **kwargs)
