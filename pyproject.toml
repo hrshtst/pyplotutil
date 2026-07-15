@@ -176,6 +176,17 @@ docstring-code-format = true
 # enabled.
 docstring-code-line-length = "dynamic"
 
+[tool.coverage.run]
+source = ["pyplotutil"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "@overload",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"

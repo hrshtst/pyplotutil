@@ -9,6 +9,10 @@ This test suite covers:
     * Directory separation by extension
     * Duplicate extension handling
 - Common path extraction functionality
+- Style application and rcParams updates
+- Mean and error calculation for every error type
+- Time series and mean-with-error plotting
+- Error band filling and figure saving
 
 The tests use parametrized fixtures to verify multiple input scenarios and edge cases for each function.
 
@@ -19,17 +23,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
 from pyplotutil.plotutil import (
+    apply_style,
     calculate_mean_err,
     compatible_filename,
     extract_common_path,
     fill_between_err,
     get_limits,
+    get_tlim_mask,
     make_figure_paths,
+    plot_mean_err,
+    plot_multi_timeseries,
+    save_figure,
 )
 from tests.test_datautil import DATA_DIR_PATH
 
@@ -277,6 +288,240 @@ def test_make_figure_paths(
     assert set(figure_paths) == {Path(e) for e in expected}
 
 
+@pytest.mark.parametrize(
+    ("style", "rc_key", "rc_value"),
+    [
+        ("science", "text.usetex", True),
+        ("ieee", "figure.dpi", 100.0),
+        ("nature", "text.usetex", True),
+        ("notebook", "figure.figsize", [8.0, 6.0]),
+    ],
+)
+def test_apply_style(style: str, rc_key: str, rc_value: object) -> None:
+    """Test that each style name updates matplotlib rcParams."""
+    with mpl.rc_context():
+        apply_style(style)  # type: ignore[arg-type]
+        assert plt.rcParams[rc_key] == rc_value
+
+
+def test_apply_style_options() -> None:
+    """Test that style options toggle the corresponding rcParams."""
+    with mpl.rc_context():
+        apply_style("science", grid=True, no_latex=True)
+        assert plt.rcParams["axes.grid"] is True
+        assert plt.rcParams["text.usetex"] is False
+
+
+def test_apply_style_unsupported() -> None:
+    """Test that an unsupported style name raises ValueError."""
+    with mpl.rc_context(), pytest.raises(ValueError, match="Unsupported style: fancy"):
+        apply_style("fancy")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("tlim", "expected"),
+    [
+        (None, [True, True, True, True]),
+        ((1.0, 2.0), [False, True, True, False]),
+        ((0.0, 0.5), [True, False, False, False]),
+        ((4.0, 9.0), [False, False, False, False]),
+    ],
+)
+def test_get_tlim_mask(tlim: tuple[float, float] | None, expected: list[bool]) -> None:
+    """Test boolean mask generation for time limits."""
+    t = np.array([0.0, 1.0, 2.0, 3.0])
+    np.testing.assert_array_equal(get_tlim_mask(t, tlim), np.array(expected))
+
+
+class TestCalculateMeanErr:
+    """A class collecting tests for `calculate_mean_err`."""
+
+    data_array = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 12.0]])
+
+    @pytest.mark.parametrize("err_type", ["std", "sd", "STD", "Sd"])
+    def test_std(self, err_type: str) -> None:
+        """Test standard deviation error, including case-insensitive aliases."""
+        mean, err1, err2 = calculate_mean_err(self.data_array, err_type=err_type)
+        np.testing.assert_allclose(mean, np.mean(self.data_array, axis=0))
+        np.testing.assert_allclose(err1, np.std(self.data_array, axis=0))
+        assert err2 is None
+
+    def test_std_ddof(self) -> None:
+        """Test that ddof is forwarded to the deviation calculation."""
+        _, err1, _ = calculate_mean_err(self.data_array, err_type="std", ddof=1)
+        np.testing.assert_allclose(err1, np.std(self.data_array, axis=0, ddof=1))
+
+    def test_var(self) -> None:
+        """Test variance error."""
+        mean, err1, err2 = calculate_mean_err(self.data_array, err_type="var")
+        np.testing.assert_allclose(mean, np.mean(self.data_array, axis=0))
+        np.testing.assert_allclose(err1, np.var(self.data_array, axis=0))
+        assert err2 is None
+
+    def test_range(self) -> None:
+        """Test that range errors are distances from the mean to the extremes."""
+        mean, err1, err2 = calculate_mean_err(self.data_array, err_type="range")
+        np.testing.assert_allclose(err1, mean - np.min(self.data_array, axis=0))
+        assert err2 is not None
+        np.testing.assert_allclose(err2, np.max(self.data_array, axis=0) - mean)
+
+    def test_ci_not_implemented(self) -> None:
+        """Test that confidence intervals are not implemented yet."""
+        with pytest.raises(NotImplementedError):
+            calculate_mean_err(self.data_array, err_type="ci")
+
+    def test_unrecognized_err_type(self) -> None:
+        """Test that an unknown error type raises ValueError."""
+        with pytest.raises(ValueError, match="unrecognized error type: bogus"):
+            calculate_mean_err(self.data_array, err_type="bogus")
+
+    def test_non_string_err_type(self) -> None:
+        """Test that a non-string error type raises TypeError."""
+        with pytest.raises(TypeError, match="`err_type` must be string"):
+            calculate_mean_err(self.data_array, err_type=123)  # type: ignore[arg-type]
+
+
+class TestPlotMultiTimeseries:
+    """A class collecting tests for `plot_multi_timeseries`."""
+
+    t = np.linspace(0.0, 1.0, 11)
+    y_arr = np.vstack([np.sin(t), np.cos(t)])
+
+    def test_default_labels(self) -> None:
+        """Test that lines are labeled by index when no labels are given."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr, tlim=None, lw=None)
+        assert [line.get_label() for line in lines] == ["0", "1"]
+
+    def test_string_label_expansion(self) -> None:
+        """Test that a single string label is expanded per line."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr, tlim=None, lw=None, labels="y")
+        assert [line.get_label() for line in lines] == ["y_0", "y_1"]
+
+    def test_string_label_single_series(self) -> None:
+        """Test that a single string label is kept as-is for a single series."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr[0], tlim=None, lw=None, labels="y")
+        assert [line.get_label() for line in lines] == ["y"]
+
+    def test_tlim_masks_data(self) -> None:
+        """Test that time limits clip the plotted data."""
+        ax = Figure().add_subplot()
+        tlim = (0.2, 0.8)
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr, tlim=tlim, lw=None)
+        for line in lines:
+            xdata = np.asarray(line.get_xdata())
+            assert xdata.min() >= tlim[0]
+            assert xdata.max() <= tlim[1]
+
+    def test_cmap_assigns_distinct_colors(self) -> None:
+        """Test that a colormap assigns a distinct color per line."""
+        ax = Figure().add_subplot()
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr, tlim=None, lw=None, cmap_name="viridis")
+        assert lines[0].get_color() != lines[1].get_color()
+
+    def test_fmt_and_lw(self) -> None:
+        """Test that format string and line width are applied."""
+        ax = Figure().add_subplot()
+        line_width = 3
+        lines = plot_multi_timeseries(ax, self.t, self.y_arr, tlim=None, lw=line_width, fmt="--")
+        assert all(line.get_linewidth() == line_width for line in lines)
+
+
+class TestPlotMeanErr:
+    """A class collecting tests for `plot_mean_err`."""
+
+    t = np.linspace(0.0, 1.0, 11)
+    y_arr = np.vstack([np.sin(t), np.cos(t), np.sin(t) + 1.0])
+
+    def test_no_error(self) -> None:
+        """Test that plotting without error draws the mean only."""
+        ax = Figure().add_subplot()
+        line = plot_mean_err(ax, self.t, self.y_arr, None, tlim=None, lw=None, capsize=None, label="mean")
+        np.testing.assert_allclose(np.asarray(line.get_ydata()), np.mean(self.y_arr, axis=0))
+        assert not ax.containers
+
+    def test_symmetric_error(self) -> None:
+        """Test that a one-sided error type draws error bars around the mean."""
+        ax = Figure().add_subplot()
+        line = plot_mean_err(ax, self.t, self.y_arr, "std", tlim=None, lw=None, capsize=2)
+        np.testing.assert_allclose(np.asarray(line.get_ydata()), np.mean(self.y_arr, axis=0))
+        assert len(ax.containers) == 1
+
+    def test_two_sided_error(self) -> None:
+        """Test that a two-sided error type draws asymmetric error bars."""
+        ax = Figure().add_subplot()
+        line = plot_mean_err(ax, self.t, self.y_arr, "range", tlim=None, lw=1, capsize=None, color="C1")
+        np.testing.assert_allclose(np.asarray(line.get_ydata()), np.mean(self.y_arr, axis=0))
+        assert len(ax.containers) == 1
+
+
+class TestFillBetweenErr:
+    """A class collecting tests for `fill_between_err`."""
+
+    t = np.linspace(0.0, 1.0, 11)
+    y_arr = np.vstack([np.sin(t), np.cos(t), np.sin(t) + 1.0])
+
+    def test_none_err_type_raises(self) -> None:
+        """Test that a missing error type raises ValueError by default."""
+        ax = Figure().add_subplot()
+        with pytest.raises(ValueError, match="must not be None"):
+            fill_between_err(ax, self.t, self.y_arr, None, tlim=None, color=None, alpha=None)
+
+    def test_none_err_type_suppressed(self) -> None:
+        """Test that a missing error type is a no-op when suppressed."""
+        ax = Figure().add_subplot()
+        result = fill_between_err(
+            ax, self.t, self.y_arr, None, tlim=None, color=None, alpha=None, suppress_exception=True
+        )
+        assert result is ax
+        assert not ax.collections
+
+    def test_symmetric_band(self) -> None:
+        """Test that a one-sided error type fills the band mean +/- err."""
+        ax = Figure().add_subplot()
+        fill_between_err(ax, self.t, self.y_arr, "std", tlim=None, color="C0", alpha=0.3)
+        mean = np.mean(self.y_arr, axis=0)
+        std = np.std(self.y_arr, axis=0)
+        vertices = np.asarray(ax.collections[0].get_paths()[0].vertices)
+        for i, x in enumerate(self.t):
+            band_y = vertices[np.isclose(vertices[:, 0], x), 1]
+            assert band_y.min() == pytest.approx(mean[i] - std[i])
+            assert band_y.max() == pytest.approx(mean[i] + std[i])
+
+
+class TestSaveFigure:
+    """A class collecting tests for `save_figure`."""
+
+    @staticmethod
+    def make_figure() -> Figure:
+        """Return a small figure with a single line plot."""
+        fig = Figure()
+        ax = fig.add_subplot()
+        ax.plot([0.0, 1.0], [0.0, 1.0])
+        return fig
+
+    def test_save_multiple_extensions(self, tmp_path: Path) -> None:
+        """Test saving a figure to multiple file formats."""
+        fig = self.make_figure()
+        paths = save_figure(fig, tmp_path, "myfig", ["png", ".pdf"])
+        assert set(paths) == {tmp_path / "myfig.png", tmp_path / "myfig.pdf"}
+        assert all(p.is_file() for p in paths)
+
+    def test_no_extensions_saves_nothing(self, tmp_path: Path) -> None:
+        """Test that no files are written when extensions is None."""
+        fig = self.make_figure()
+        assert save_figure(fig, tmp_path, "myfig", None) == []
+        assert list(tmp_path.iterdir()) == []
+
+    def test_none_output_directory_raises(self) -> None:
+        """Test that a None output directory raises ValueError."""
+        fig = self.make_figure()
+        with pytest.raises(ValueError, match="'None' is not allowed"):
+            save_figure(fig, None, "myfig", "png")  # type: ignore[arg-type]
+
+
 def test_calculate_mean_err_se_divides_by_trial_count() -> None:
     """Test that standard error scales the deviation by the number of trials, not time points."""
     n_trials = 4
@@ -406,5 +651,5 @@ def test_get_limits(
 
 
 # Local Variables:
-# jinx-local-words: "axb basename csv cxx dat dir jpg noqa parametrized pdf plotutil png px pyplotutil pytest str xlim ylim" # noqa: E501
+# jinx-local-words: "axb basename cmap csv cxx dat ddof dir err figsize jpg linewidth myfig noqa parametrized pdf plotutil png px pyplotutil pytest rcParams str tlim usetex viridis xdata xlim ylim" # noqa: E501
 # End:

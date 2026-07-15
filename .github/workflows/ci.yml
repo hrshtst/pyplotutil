@@ -73,7 +73,7 @@ jobs:
           enable-cache: true
 
       - name: Run tests on ${{ matrix.os }}
-        run: uvx --from 'nox[uv]' nox --non-interactive --error-on-missing-interpreters --session "tests-${{ matrix.python-version }}" -- --full-trace
+        run: uvx --from 'nox[uv]' nox --non-interactive --error-on-missing-interpreters --session "tests-${{ matrix.python-version }}" -- --full-trace --cov
 
 # Local Variables:
 # jinx-local-words: "ci github macos md nox os typecheck ubuntu uv uvx"
