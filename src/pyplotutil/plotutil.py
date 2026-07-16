@@ -1303,6 +1303,358 @@ def setup_axes(
     return ax
 
 
+def _orientation(p: tuple[float, float], q: tuple[float, float], r: tuple[float, float]) -> int:
+    """Return the orientation of the ordered point triplet (p, q, r).
+
+    Parameters
+    ----------
+    p : tuple[float, float]
+        First point.
+    q : tuple[float, float]
+        Second point.
+    r : tuple[float, float]
+        Third point.
+
+    Returns
+    -------
+    int
+        0 for collinear, 1 for clockwise, and 2 for counterclockwise ordering.
+
+    """
+    val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+    if val > 0:
+        return 1
+    if val < 0:
+        return 2
+    return 0
+
+
+def _on_segment(p: tuple[float, float], q: tuple[float, float], r: tuple[float, float]) -> bool:
+    """Check whether point q lies on segment (p, r), assuming the points are collinear.
+
+    Parameters
+    ----------
+    p : tuple[float, float]
+        Segment start.
+    q : tuple[float, float]
+        Point to check.
+    r : tuple[float, float]
+        Segment end.
+
+    Returns
+    -------
+    bool
+        True if q lies on the segment.
+
+    """
+    return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
+
+
+def _segments_intersect(
+    p1: tuple[float, float],
+    q1: tuple[float, float],
+    p2: tuple[float, float],
+    q2: tuple[float, float],
+) -> bool:
+    """Check whether segments (p1, q1) and (p2, q2) intersect, including touching cases.
+
+    Parameters
+    ----------
+    p1 : tuple[float, float]
+        Start of the first segment.
+    q1 : tuple[float, float]
+        End of the first segment.
+    p2 : tuple[float, float]
+        Start of the second segment.
+    q2 : tuple[float, float]
+        End of the second segment.
+
+    Returns
+    -------
+    bool
+        True if the segments intersect.
+
+    """
+    o1 = _orientation(p1, q1, p2)
+    o2 = _orientation(p1, q1, q2)
+    o3 = _orientation(p2, q2, p1)
+    o4 = _orientation(p2, q2, q1)
+    if o1 != o2 and o3 != o4:
+        return True
+    if o1 == 0 and _on_segment(p1, p2, q1):
+        return True
+    if o2 == 0 and _on_segment(p1, q2, q1):
+        return True
+    if o3 == 0 and _on_segment(p2, p1, q2):
+        return True
+    return o4 == 0 and _on_segment(p2, q1, q2)
+
+
+def _make_arrow(
+    ax: Axes,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    *,
+    color: ColorType,
+    size: float,
+    arrowstyle: str,
+) -> Annotation:
+    """Draw a head-only arrow from start to end in data coordinates.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    start : tuple[float, float]
+        Arrow tail in data coordinates.
+    end : tuple[float, float]
+        Arrow head in data coordinates.
+    color : ColorType
+        Arrow color.
+    size : float
+        Arrowhead size (mutation scale).
+    arrowstyle : str
+        Arrow style name.
+
+    Returns
+    -------
+    Annotation
+        The created annotation.
+
+    """
+    return ax.annotate(
+        "",
+        xytext=start,
+        xy=end,
+        arrowprops={"arrowstyle": arrowstyle, "color": color, "lw": 0, "mutation_scale": size},
+    )
+
+
+def add_direction_arrows(
+    ax: Axes,
+    line: Line2D,
+    *,
+    positions: Iterable[float] | None = None,
+    crossing: tuple[tuple[float, float], tuple[float, float]] | None = None,
+    size: float = 6.0,
+    color: ColorType | None = None,
+    arrowstyle: str = "-|>",
+    reverse: bool = False,
+    which: Literal["first", "all"] = "all",
+    min_spacing: float = 1e-3,
+    seen_crossings: list[tuple[float, float]] | None = None,
+) -> list[Annotation]:
+    """Add arrowheads to a plotted line indicating its direction of travel.
+
+    Arrows are placed either at fractional arc-length positions along the line, or where
+    the line crosses an auxiliary segment (useful for phase portraits). When neither
+    `positions` nor `crossing` is given, a single arrow is placed halfway along the line.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    line : Line2D
+        The plotted line to decorate.
+    positions : Iterable[float] or None, optional
+        Fractional positions along the line between 0 and 1, by default None.
+    crossing : tuple[tuple[float, float], tuple[float, float]] or None, optional
+        End points of an auxiliary segment; an arrow is drawn on every line segment that
+        crosses it, by default None. Mutually exclusive with `positions`.
+    size : float, optional
+        Arrowhead size (mutation scale), by default 6.0.
+    color : ColorType or None, optional
+        Arrow color, by default None, which follows the line color.
+    arrowstyle : str, optional
+        Arrow style name, by default "-|>".
+    reverse : bool, optional
+        Point the arrows against the data order, by default False.
+    which : {"first", "all"}, optional
+        Whether to draw an arrow at only the first crossing or at all crossings,
+        by default "all". Only used with `crossing`.
+    min_spacing : float, optional
+        Crossings closer than this to an already processed crossing are skipped,
+        by default 1e-3. Only used with `crossing`.
+    seen_crossings : list[tuple[float, float]] or None, optional
+        Mutable record of processed crossings, shared between calls to avoid overlapping
+        arrows from multiple lines, by default None. Only used with `crossing`.
+
+    Returns
+    -------
+    list[Annotation]
+        The created arrow annotations.
+
+    Raises
+    ------
+    ValueError
+        If both `positions` and `crossing` are given, if a position is outside [0, 1],
+        or if the line has fewer than two points.
+
+    """
+    if positions is not None and crossing is not None:
+        msg = "`positions` and `crossing` are mutually exclusive."
+        raise ValueError(msg)
+    if color is None:
+        color = line.get_color()
+    xdata = np.ravel(line.get_xdata())
+    ydata = np.ravel(line.get_ydata())
+    min_points = 2
+    if len(xdata) < min_points:
+        msg = f"`line` must have at least {min_points} points: {len(xdata)}"
+        raise ValueError(msg)
+    if crossing is not None:
+        return _arrows_at_crossings(
+            ax,
+            xdata,
+            ydata,
+            crossing,
+            color=color,
+            size=size,
+            arrowstyle=arrowstyle,
+            reverse=reverse,
+            which=which,
+            min_spacing=min_spacing,
+            seen_crossings=seen_crossings,
+        )
+    if positions is None:
+        positions = (0.5,)
+    return _arrows_at_positions(
+        ax,
+        xdata,
+        ydata,
+        positions,
+        color=color,
+        size=size,
+        arrowstyle=arrowstyle,
+        reverse=reverse,
+    )
+
+
+def _arrows_at_positions(
+    ax: Axes,
+    xdata: np.ndarray,
+    ydata: np.ndarray,
+    positions: Iterable[float],
+    *,
+    color: ColorType,
+    size: float,
+    arrowstyle: str,
+    reverse: bool,
+) -> list[Annotation]:
+    """Draw direction arrows at fractional arc-length positions along a polyline.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    xdata : np.ndarray
+        X values of the polyline.
+    ydata : np.ndarray
+        Y values of the polyline.
+    positions : Iterable[float]
+        Fractional positions along the polyline between 0 and 1.
+    color : ColorType
+        Arrow color.
+    size : float
+        Arrowhead size (mutation scale).
+    arrowstyle : str
+        Arrow style name.
+    reverse : bool
+        Point the arrows against the data order.
+
+    Returns
+    -------
+    list[Annotation]
+        The created arrow annotations.
+
+    Raises
+    ------
+    ValueError
+        If a position is outside [0, 1].
+
+    """
+    arc = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(xdata), np.diff(ydata)))))
+    annotations: list[Annotation] = []
+    for position in positions:
+        if not 0.0 <= position <= 1.0:
+            msg = f"`positions` must be between 0 and 1: {position}"
+            raise ValueError(msg)
+        index = int(np.searchsorted(arc, position * arc[-1], side="right")) - 1
+        index = min(max(index, 0), len(xdata) - 2)
+        start = (float(xdata[index]), float(ydata[index]))
+        end = (float(xdata[index + 1]), float(ydata[index + 1]))
+        if reverse:
+            start, end = end, start
+        annotations.append(_make_arrow(ax, start, end, color=color, size=size, arrowstyle=arrowstyle))
+    return annotations
+
+
+def _arrows_at_crossings(
+    ax: Axes,
+    xdata: np.ndarray,
+    ydata: np.ndarray,
+    crossing: tuple[tuple[float, float], tuple[float, float]],
+    *,
+    color: ColorType,
+    size: float,
+    arrowstyle: str,
+    reverse: bool,
+    which: Literal["first", "all"],
+    min_spacing: float,
+    seen_crossings: list[tuple[float, float]] | None,
+) -> list[Annotation]:
+    """Draw direction arrows where a polyline crosses an auxiliary segment.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes object.
+    xdata : np.ndarray
+        X values of the polyline.
+    ydata : np.ndarray
+        Y values of the polyline.
+    crossing : tuple[tuple[float, float], tuple[float, float]]
+        End points of the auxiliary segment.
+    color : ColorType
+        Arrow color.
+    size : float
+        Arrowhead size (mutation scale).
+    arrowstyle : str
+        Arrow style name.
+    reverse : bool
+        Point the arrows against the data order.
+    which : {"first", "all"}
+        Whether to stop after the first crossing.
+    min_spacing : float
+        Crossings closer than this to an already processed crossing are skipped.
+    seen_crossings : list[tuple[float, float]] or None
+        Mutable record of processed crossings shared between calls.
+
+    Returns
+    -------
+    list[Annotation]
+        The created arrow annotations.
+
+    """
+    p2, q2 = crossing
+    processed = seen_crossings if seen_crossings is not None else []
+    annotations: list[Annotation] = []
+    for i in range(len(xdata) - 1):
+        p1 = (float(xdata[i]), float(ydata[i]))
+        q1 = (float(xdata[i + 1]), float(ydata[i + 1]))
+        if not _segments_intersect(p1, q1, p2, q2):
+            continue
+        if min_spacing > 0 and any(np.allclose(seen, p1, atol=min_spacing) for seen in processed):
+            processed.append(p1)
+            continue
+        start, end = (q1, p1) if reverse else (p1, q1)
+        annotations.append(_make_arrow(ax, start, end, color=color, size=size, arrowstyle=arrowstyle))
+        processed.append(p1)
+        if which == "first":
+            break
+    return annotations
+
+
 def annotate_with_arrow(
     ax: Axes,
     text: str,

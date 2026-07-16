@@ -33,6 +33,7 @@ from matplotlib.patches import Rectangle
 
 from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.plotutil import (
+    add_direction_arrows,
     annotate_with_arrow,
     apply_style,
     calculate_mean_err,
@@ -53,6 +54,9 @@ from tests.test_datautil import DATA_DIR_PATH
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+    from matplotlib.axes import Axes
+    from matplotlib.lines import Line2D
 
     from pyplotutil._typing import FilePath
 
@@ -610,6 +614,107 @@ class TestFillBetweenErr:
             band_y = vertices[np.isclose(vertices[:, 0], x), 1]
             assert band_y.min() == pytest.approx(mean[i] - std[i])
             assert band_y.max() == pytest.approx(mean[i] + std[i])
+
+
+class TestAddDirectionArrows:
+    """A class collecting tests for `add_direction_arrows`."""
+
+    @staticmethod
+    def straight_line(ax: Axes) -> Line2D:
+        """Plot a straight line along the x axis with unit-spaced points."""
+        x = np.arange(11.0)
+        return ax.plot(x, np.zeros_like(x), color="C0")[0]
+
+    @staticmethod
+    def zigzag_line(ax: Axes) -> Line2D:
+        """Plot a line crossing y=0 twice: rising at x=0-1 and falling at x=1-2."""
+        return ax.plot([0.0, 1.0, 2.0, 3.0], [-1.0, 1.0, -1.0, -1.0], color="C0")[0]
+
+    def test_default_places_one_arrow_at_midpoint(self) -> None:
+        """Test that the default places a single arrow halfway along the line."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        annotations = add_direction_arrows(ax, line)
+        assert len(annotations) == 1
+        assert annotations[0].xyann == (5.0, 0.0)
+        assert annotations[0].xy == (6.0, 0.0)
+
+    def test_positions(self) -> None:
+        """Test arrows at explicit fractional positions."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        annotations = add_direction_arrows(ax, line, positions=[0.0, 0.5, 1.0])
+        assert [a.xyann for a in annotations] == [(0.0, 0.0), (5.0, 0.0), (9.0, 0.0)]
+        assert [a.xy for a in annotations] == [(1.0, 0.0), (6.0, 0.0), (10.0, 0.0)]
+
+    def test_reverse(self) -> None:
+        """Test that reverse points the arrow against the data order."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        annotations = add_direction_arrows(ax, line, positions=[0.5], reverse=True)
+        assert annotations[0].xyann == (6.0, 0.0)
+        assert annotations[0].xy == (5.0, 0.0)
+
+    def test_color_defaults_to_line_color(self) -> None:
+        """Test that arrows follow the line color unless overridden."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        annotations = add_direction_arrows(ax, line)
+        assert annotations[0].arrow_patch is not None
+        assert annotations[0].arrow_patch.get_edgecolor() == mpl.colors.to_rgba("C0")
+
+    def test_position_out_of_range(self) -> None:
+        """Test that a position outside [0, 1] raises ValueError."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        with pytest.raises(ValueError, match="must be between 0 and 1"):
+            add_direction_arrows(ax, line, positions=[1.5])
+
+    def test_mutually_exclusive_modes(self) -> None:
+        """Test that giving both positions and crossing raises ValueError."""
+        ax = Figure().add_subplot()
+        line = self.straight_line(ax)
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            add_direction_arrows(ax, line, positions=[0.5], crossing=((0.0, -1.0), (0.0, 1.0)))
+
+    def test_too_few_points(self) -> None:
+        """Test that a line with a single point raises ValueError."""
+        ax = Figure().add_subplot()
+        line = ax.plot([0.0], [0.0])[0]
+        with pytest.raises(ValueError, match="at least 2 points"):
+            add_direction_arrows(ax, line)
+
+    def test_crossing_all(self) -> None:
+        """Test arrows at every crossing with an auxiliary segment."""
+        ax = Figure().add_subplot()
+        line = self.zigzag_line(ax)
+        annotations = add_direction_arrows(ax, line, crossing=((-10.0, 0.0), (10.0, 0.0)))
+        expected_crossings = 2
+        assert len(annotations) == expected_crossings
+        assert annotations[0].xyann == (0.0, -1.0)
+        assert annotations[0].xy == (1.0, 1.0)
+        assert annotations[1].xyann == (1.0, 1.0)
+        assert annotations[1].xy == (2.0, -1.0)
+
+    def test_crossing_first_only(self) -> None:
+        """Test that which='first' stops after the first crossing."""
+        ax = Figure().add_subplot()
+        line = self.zigzag_line(ax)
+        annotations = add_direction_arrows(ax, line, crossing=((-10.0, 0.0), (10.0, 0.0)), which="first")
+        assert len(annotations) == 1
+        assert annotations[0].xyann == (0.0, -1.0)
+
+    def test_seen_crossings_deduplicates_across_calls(self) -> None:
+        """Test that a shared crossing record suppresses overlapping arrows."""
+        ax = Figure().add_subplot()
+        line = self.zigzag_line(ax)
+        seen: list[tuple[float, float]] = []
+        first = add_direction_arrows(ax, line, crossing=((-10.0, 0.0), (10.0, 0.0)), seen_crossings=seen)
+        expected_crossings = 2
+        assert len(first) == expected_crossings
+        assert len(seen) == expected_crossings
+        second = add_direction_arrows(ax, line, crossing=((-10.0, 0.0), (10.0, 0.0)), seen_crossings=seen)
+        assert second == []
 
 
 class TestMaskToSpans:

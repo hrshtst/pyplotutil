@@ -16,6 +16,7 @@ from pyplotutil.loggingutil import (
     start_logging,
 )
 from pyplotutil.plotutil import (
+    add_direction_arrows,
     annotate_with_arrow,
     apply_ieee_style,
     apply_nature_style,
@@ -49,6 +50,7 @@ __all__ = [
     "FakeLogger",
     "TaggedData",
     "__version__",
+    "add_direction_arrows",
     "annotate_with_arrow",
     "apply_ieee_style",
     "apply_nature_style",
