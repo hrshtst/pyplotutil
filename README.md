@@ -11,8 +11,8 @@ publications.
 - Load tabular data from CSV, Parquet, JSON/NDJSON, or Excel files,
   buffers, or polars frames with column-attribute access
   (`data.time`, `data.voltage`)
-- Group rows by a tag column (`TaggedData`) or manage whole
-  directories of data files (`Dataset`)
+- Group rows by a tag column (`TaggedData`, `load_tagged_data`) or
+  manage whole directories of data files (`Dataset`)
 - Plot multiple time series and mean-with-error graphs (standard
   deviation, standard error, variance, range, confidence interval)
 - Plot directly from data objects: one line per file for a

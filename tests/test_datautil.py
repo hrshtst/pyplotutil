@@ -20,7 +20,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 
-from pyplotutil.datautil import Data, Dataset, TaggedData
+from pyplotutil.datautil import Data, Dataset, TaggedData, load_tagged_data
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -1006,6 +1006,60 @@ def test_get_timeseries(data_files: list[Path], n_data: int, n_rows: int, t_shif
     assert values.shape == (n_data, n_rows)
     assert len(t) == len(values[0])
     assert t[0] == -t_shift  # Check t_shift applied
+
+
+class TestLoadTaggedData:
+    """A class collecting tests for `load_tagged_data`."""
+
+    CSV = "tag,a\nx,1\nx,2\ny,3\n"
+
+    def write_files(self, directory: Path, n_files: int) -> list[Path]:
+        """Write tagged CSV files into a directory and return their paths."""
+        paths = []
+        for i in range(n_files):
+            path = directory / f"tagged{i}.csv"
+            path.write_text(self.CSV)
+            paths.append(path)
+        return paths
+
+    def test_load_from_files(self, tmp_path: Path) -> None:
+        """Test loading TaggedData objects from explicit file paths."""
+        paths = self.write_files(tmp_path, 2)
+        tagged_list = load_tagged_data(paths)
+        expected_files = 2
+        assert len(tagged_list) == expected_files
+        for tagged in tagged_list:
+            assert isinstance(tagged, TaggedData)
+            assert sorted(tagged.tags()) == ["x", "y"]
+
+    def test_load_from_directory(self, tmp_path: Path) -> None:
+        """Test loading TaggedData objects from a directory with a glob pattern."""
+        self.write_files(tmp_path, 3)
+        tagged_list = load_tagged_data(tmp_path, glob_pattern="tagged*.csv")
+        expected_files = 3
+        assert len(tagged_list) == expected_files
+
+    def test_custom_tag_column(self, tmp_path: Path) -> None:
+        """Test that the tag column name is forwarded to TaggedData."""
+        path = tmp_path / "trial.csv"
+        path.write_text("trial,a\nt1,1\nt2,2\n")
+        tagged_list = load_tagged_data([path], tag_column="trial")
+        assert sorted(tagged_list[0].tags()) == ["t1", "t2"]
+
+    def test_n_pickup_per_directory(self, tmp_path: Path) -> None:
+        """Test limiting the number of files collected per directory."""
+        self.write_files(tmp_path, 3)
+        assert len(load_tagged_data(tmp_path, glob_pattern="tagged*.csv", n_pickup_per_directory=2)) == 2  # noqa: PLR2004
+
+    def test_missing_path(self, tmp_path: Path) -> None:
+        """Test that a nonexistent source path raises ValueError."""
+        with pytest.raises(ValueError, match="Source path does not exist"):
+            load_tagged_data(tmp_path / "missing.csv")
+
+    def test_empty_directory_warns(self, tmp_path: Path) -> None:
+        """Test that a directory without matching files warns."""
+        with pytest.warns(UserWarning, match="No files found"):
+            assert load_tagged_data(tmp_path) == []
 
 
 class TestDataFileFormats:

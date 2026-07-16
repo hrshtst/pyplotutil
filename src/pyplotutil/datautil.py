@@ -1008,6 +1008,127 @@ class TaggedData(BaseData):
         return f"{self.__class__.__name__}({self.dataframe}, tag={self._tag_column_name})"
 
 
+def _collect_source_files(
+    source_paths: FilePath | Iterable[FilePath],
+    *,
+    glob_pattern: str,
+    n_pickup_per_directory: int | None,
+) -> list[Path]:
+    """Collect data file paths from a mixture of files and directories.
+
+    Parameters
+    ----------
+    source_paths : FilePath | Iterable[FilePath]
+        Path(s) to data files or directories.
+    glob_pattern : str
+        Pattern for finding files in directories.
+    n_pickup_per_directory : int | None
+        Maximum number of files to collect per directory.
+
+    Returns
+    -------
+    list[Path]
+        The collected file paths.
+
+    Raises
+    ------
+    ValueError
+        If a source path does not exist.
+
+    Warns
+    -----
+    UserWarning
+        If no files match the glob pattern in a directory.
+
+    """
+    if isinstance(source_paths, FilePath):
+        source_paths = [source_paths]
+    collected: list[Path] = []
+    for source_path in source_paths:
+        path = Path(source_path)
+        if not path.exists():
+            msg = f"{_ERR_MSG_PATH_NOT_EXIST}: {path!s}"
+            raise ValueError(msg)
+        if path.is_dir():
+            found_files = sorted(path.glob(glob_pattern))
+            if n_pickup_per_directory is not None:
+                found_files = found_files[:n_pickup_per_directory]
+            if len(found_files) == 0:
+                msg = f"{_WARN_MSG_NO_FILES_FOUND}: {path!s}, {glob_pattern}"
+                warnings.warn(msg, UserWarning, stacklevel=3)
+            collected.extend(found_files)
+        else:
+            collected.append(path)
+    return collected
+
+
+def load_tagged_data(
+    source_paths: FilePath | Iterable[FilePath],
+    *,
+    separator: str = ",",
+    has_header: bool = True,
+    columns: Sequence[int] | Sequence[str] | None = None,
+    names: Sequence[str] | None = None,
+    n_rows: int | None = None,
+    comment: str | None = None,
+    tag_column: str = "tag",
+    glob_pattern: str = "**/*.csv",
+    n_pickup_per_directory: int | None = None,
+) -> list[TaggedData]:
+    """Load multiple TaggedData objects from files and directories.
+
+    Parameters
+    ----------
+    source_paths : FilePath | Iterable[FilePath]
+        Path(s) to data files or directories.
+    separator : str, optional
+        Single byte character to use as separator in the file, by default ",".
+    has_header : bool, optional
+        Whether data files have headers, by default True.
+    columns : Sequence[int] | Sequence[str] | None, optional
+        Columns to read from files.
+    names : Sequence[str] | None, optional
+        Names to assign to columns.
+    n_rows : int | None, optional
+        Number of rows to read.
+    comment : str | None, optional
+        Character to indicate comments in data files.
+    tag_column : str, optional
+        Column name used to tag and group data, by default "tag".
+    glob_pattern : str, optional
+        Pattern for finding files in directories, by default "**/*.csv".
+    n_pickup_per_directory : int | None, optional
+        Maximum number of files to load per directory.
+
+    Returns
+    -------
+    list[TaggedData]
+        List of loaded TaggedData objects.
+
+    Raises
+    ------
+    ValueError
+        If a source path does not exist.
+
+    """
+    loader: Callable[[Path], TaggedData] = partial(
+        TaggedData,
+        separator=separator,
+        has_header=has_header,
+        columns=columns,
+        names=names,
+        n_rows=n_rows,
+        comment=comment,
+        tag_column=tag_column,
+    )
+    found_files = _collect_source_files(
+        source_paths,
+        glob_pattern=glob_pattern,
+        n_pickup_per_directory=n_pickup_per_directory,
+    )
+    return [loader(path) for path in found_files]
+
+
 class Dataset:
     """A class for managing multiple Data objects as a collection.
 
@@ -1221,9 +1342,6 @@ class Dataset:
             If source path does not exist.
 
         """
-        if isinstance(source_paths, FilePath):
-            source_paths = [source_paths]
-
         data_loader: Callable[[Path], Data] = partial(
             Data,
             separator=separator,
@@ -1233,24 +1351,12 @@ class Dataset:
             n_rows=n_rows,
             comment=comment,
         )
-
-        dataset: list[Data] = []
-        for source_path in source_paths:
-            path = Path(source_path)
-            if not path.exists():
-                msg = f"{_ERR_MSG_PATH_NOT_EXIST}: {path!s}"
-                raise ValueError(msg)
-            if path.is_dir():
-                found_files = sorted(path.glob(glob_pattern))
-                if n_pickup_per_directory is not None:
-                    found_files = found_files[:n_pickup_per_directory]
-                if len(found_files) == 0:
-                    msg = f"{_WARN_MSG_NO_FILES_FOUND}: {path!s}, {glob_pattern}"
-                    warnings.warn(msg, UserWarning, stacklevel=2)
-                dataset.extend(data_loader(x) for x in found_files)
-            else:
-                dataset.append(data_loader(path))
-        return dataset
+        found_files = _collect_source_files(
+            source_paths,
+            glob_pattern=glob_pattern,
+            n_pickup_per_directory=n_pickup_per_directory,
+        )
+        return [data_loader(path) for path in found_files]
 
     @cached_property
     def min_n_rows(self) -> int:

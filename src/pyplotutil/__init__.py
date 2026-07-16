@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-from pyplotutil.datautil import BaseData, Data, Dataset, TaggedData
+from pyplotutil.datautil import BaseData, Data, Dataset, TaggedData, load_tagged_data
 from pyplotutil.loggingutil import (
     FakeLogger,
     check_level,
@@ -70,6 +70,7 @@ __all__ = [
     "get_logging_level_from_verbose_count",
     "get_tlim_mask",
     "label_with_unit",
+    "load_tagged_data",
     "make_figure_paths",
     "mask_to_spans",
     "plot_mean_err",
