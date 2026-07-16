@@ -42,6 +42,7 @@ from pyplotutil.plotutil import (
     fill_between_err,
     get_limits,
     get_tlim_mask,
+    label_with_unit,
     make_figure_paths,
     mask_to_spans,
     plot_mean_err,
@@ -614,6 +615,28 @@ class TestFillBetweenErr:
             band_y = vertices[np.isclose(vertices[:, 0], x), 1]
             assert band_y.min() == pytest.approx(mean[i] - std[i])
             assert band_y.max() == pytest.approx(mean[i] + std[i])
+
+
+@pytest.mark.parametrize(
+    ("label", "unit", "units", "expected"),
+    [
+        ("Position", "m", None, "Position [m]"),
+        ("Position", "[m]", None, "Position [m]"),
+        ("Force", None, {"force": "N"}, "Force [N]"),
+        ("Force", "kN", {"force": "N"}, "Force [kN]"),
+        ("Phase", None, {"force": "N"}, "Phase"),
+        ("Position", None, None, "Position"),
+        (None, "m", None, ""),
+    ],
+)
+def test_label_with_unit(
+    label: str | None,
+    unit: str | None,
+    units: dict[str, str] | None,
+    expected: str,
+) -> None:
+    """Test label composition with explicit units, unit lookup, and fallbacks."""
+    assert label_with_unit(label, unit, units=units) == expected
 
 
 class TestAddDirectionArrows:

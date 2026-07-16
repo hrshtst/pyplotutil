@@ -50,7 +50,7 @@ from pyplotutil.datautil import Dataset, TaggedData
 from pyplotutil.loggingutil import evlog
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
@@ -1301,6 +1301,41 @@ def setup_axes(
         }
         ax.legend(**legend_kwargs)
     return ax
+
+
+def label_with_unit(
+    label: str | None,
+    unit: str | None = None,
+    *,
+    units: Mapping[str, str] | None = None,
+) -> str:
+    """Return an axis label with its unit appended in brackets, e.g. "Position [m]".
+
+    Parameters
+    ----------
+    label : str or None
+        The label text. None yields an empty string.
+    unit : str or None, optional
+        The unit text, by default None. Brackets are added unless already present.
+    units : Mapping[str, str] or None, optional
+        Mapping from lowercase label names to units, used to look up the unit when
+        `unit` is not given, by default None.
+
+    Returns
+    -------
+    str
+        The label with its unit, or the bare label when no unit is known.
+
+    """
+    if label is None:
+        return ""
+    if unit is None and units is not None:
+        unit = units.get(label.lower())
+    if unit is None:
+        return label
+    if not (unit.startswith("[") and unit.endswith("]")):
+        unit = f"[{unit}]"
+    return f"{label} {unit}"
 
 
 def _orientation(p: tuple[float, float], q: tuple[float, float], r: tuple[float, float]) -> int:
