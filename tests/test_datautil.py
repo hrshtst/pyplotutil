@@ -1008,6 +1008,70 @@ def test_get_timeseries(data_files: list[Path], n_data: int, n_rows: int, t_shif
     assert t[0] == -t_shift  # Check t_shift applied
 
 
+class TestDataFileFormats:
+    """A class collecting tests for reading non-CSV data sources."""
+
+    @staticmethod
+    def sample_dataframe() -> pl.DataFrame:
+        """Return a small DataFrame used to generate data files."""
+        return pl.DataFrame({"a": [0, 1, 2], "b": [0.0, 0.1, 0.2], "c": [10, 20, 30]})
+
+    def test_read_parquet(self, tmp_path: Path) -> None:
+        """Test loading a Parquet file."""
+        expected = self.sample_dataframe()
+        path = tmp_path / "test.parquet"
+        expected.write_parquet(path)
+        data = Data(path)
+        assert_frame_equal(data.dataframe, expected)
+        assert data.datapath == path
+
+    def test_read_json(self, tmp_path: Path) -> None:
+        """Test loading a JSON file."""
+        expected = self.sample_dataframe()
+        path = tmp_path / "test.json"
+        expected.write_json(path)
+        assert_frame_equal(Data(path).dataframe, expected)
+
+    @pytest.mark.parametrize("suffix", [".ndjson", ".jsonl"])
+    def test_read_ndjson(self, tmp_path: Path, suffix: str) -> None:
+        """Test loading newline-delimited JSON files."""
+        expected = self.sample_dataframe()
+        path = (tmp_path / "test").with_suffix(suffix)
+        expected.write_ndjson(path)
+        assert_frame_equal(Data(path).dataframe, expected)
+
+    def test_options_applied_to_parquet(self, tmp_path: Path) -> None:
+        """Test that columns, names, and n_rows options work for non-CSV sources."""
+        path = tmp_path / "test.parquet"
+        self.sample_dataframe().write_parquet(path)
+        data = Data(path, columns=["a", "b"], names=["x", "y"], n_rows=2)
+        expected = pl.DataFrame({"x": [0, 1], "y": [0.0, 0.1]})
+        assert_frame_equal(data.dataframe, expected)
+
+    def test_tagged_data_parquet(self, tmp_path: Path) -> None:
+        """Test loading a Parquet file into TaggedData."""
+        path = tmp_path / "tagged.parquet"
+        pl.DataFrame({"tag": ["x", "x", "y"], "a": [1, 2, 3]}).write_parquet(path)
+        tagged = TaggedData(path)
+        assert sorted(tagged.tags()) == ["x", "y"]
+        assert_series_equal(tagged.get("y").a, pl.Series("a", [3]))
+
+    def test_dataset_parquet_glob(self, tmp_path: Path) -> None:
+        """Test collecting Parquet files into a Dataset with a custom glob pattern."""
+        for i in range(2):
+            self.sample_dataframe().write_parquet(tmp_path / f"data{i}.parquet")
+        dataset = Dataset(tmp_path, glob_pattern="*.parquet")
+        expected_files = 2
+        assert len(dataset) == expected_files
+
+    def test_unknown_suffix_reads_csv(self, tmp_path: Path) -> None:
+        """Test that unknown suffixes fall back to the CSV reader."""
+        path = tmp_path / "test.dat"
+        path.write_text(TEST_TEXT)
+        data = Data(path)
+        assert data.dataframe.columns == ["a", "b", "c", "d", "e"]
+
+
 # Local Variables:
-# jinx-local-words: "StringIO csv datadict datapath dataset datautil filepath len noqa numpy polars txt usecols"
+# jinx-local-words: "StringIO csv datadict datapath dataset datautil filepath jsonl len ndjson noqa numpy parquet polars txt usecols" # noqa: E501
 # End:

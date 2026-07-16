@@ -130,7 +130,7 @@ class BaseData:
             self._set_dataframe(data_source.to_frame())
         elif isinstance(data_source, StringIO | FilePath):
             self._set_dataframe(
-                self.read_csv(
+                self.read_file(
                     data_source,
                     separator=separator,
                     has_header=has_header,
@@ -244,6 +244,77 @@ class BaseData:
             comment_prefix=comment,
             n_rows=n_rows,
             rechunk=True,
+        )
+
+    @staticmethod
+    def read_file(
+        file_or_buffer: FilePath | StringIO,
+        *,
+        separator: str,
+        has_header: bool,
+        columns: Sequence[int] | Sequence[str] | None,
+        names: Sequence[str] | None,
+        n_rows: int | None,
+        comment: str | None,
+    ) -> pl.DataFrame:
+        """Return a polars DataFrame loaded from a file of any supported format.
+
+        The format is chosen from the file suffix: Parquet (.parquet), JSON (.json),
+        newline-delimited JSON (.ndjson, .jsonl), and Excel (.xlsx, .xls; requires an
+        optional Excel engine such as fastexcel). Anything else, including string
+        buffers, is read as CSV. The CSV-specific options `separator`, `has_header`,
+        and `comment` are ignored for non-CSV formats.
+
+        Parameters
+        ----------
+        file_or_buffer : str | Path | StringIO
+            The file or buffer to read from.
+        separator : str
+            Single byte character to use as separator in a CSV source.
+        has_header : bool
+            Indicate if the first row of a CSV dataset is a header or not.
+        columns : Sequence[int], Sequence[str] or range
+            Columns to read from the data source.
+        names : Sequence[str]
+            Rename columns right after parsing the source.
+        n_rows : int
+            Number of rows to read.
+        comment : str
+            Character to indicate comments in a CSV source.
+
+        Returns
+        -------
+        pl.DataFrame
+            The loaded DataFrame.
+
+        """
+        if isinstance(file_or_buffer, FilePath):
+            readers: dict[str, Callable[[FilePath], pl.DataFrame]] = {
+                ".parquet": pl.read_parquet,
+                ".json": pl.read_json,
+                ".ndjson": pl.read_ndjson,
+                ".jsonl": pl.read_ndjson,
+                ".xlsx": pl.read_excel,
+                ".xls": pl.read_excel,
+            }
+            reader = readers.get(Path(file_or_buffer).suffix.lower())
+            if reader is not None:
+                dataframe = reader(file_or_buffer)
+                if columns is not None:
+                    dataframe = dataframe[:, columns]
+                if n_rows is not None:
+                    dataframe = dataframe.head(n_rows)
+                if names is not None:
+                    dataframe = dataframe.rename(dict(zip(dataframe.columns, names, strict=False)))
+                return dataframe
+        return BaseData.read_csv(
+            file_or_buffer,
+            separator=separator,
+            has_header=has_header,
+            columns=columns,
+            names=names,
+            n_rows=n_rows,
+            comment=comment,
         )
 
     def _set_dataframe(self, dataframe: pl.DataFrame) -> None:

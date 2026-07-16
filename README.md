@@ -8,8 +8,9 @@ publications.
 
 ## Features
 
-- Load tabular data from CSV files, buffers, or polars frames with
-  column-attribute access (`data.time`, `data.voltage`)
+- Load tabular data from CSV, Parquet, JSON/NDJSON, or Excel files,
+  buffers, or polars frames with column-attribute access
+  (`data.time`, `data.voltage`)
 - Group rows by a tag column (`TaggedData`) or manage whole
   directories of data files (`Dataset`)
 - Plot multiple time series and mean-with-error graphs (standard
