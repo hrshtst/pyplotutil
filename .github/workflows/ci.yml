@@ -52,6 +52,7 @@ jobs:
         os:
           - ubuntu-22.04
           - ubuntu-24.04
+          - ubuntu-26.04
         # - macos-latest
         # - windows-latest
         python-version:
@@ -60,6 +61,8 @@ jobs:
           - "3.13"
           - "3.14"
     runs-on: ${{ matrix.os }}
+    # ubuntu-26.04 is a preview runner image; promote it to required once it is GA.
+    continue-on-error: ${{ matrix.os == 'ubuntu-26.04' }}
 
     steps:
       - name: Checkout
