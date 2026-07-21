@@ -34,6 +34,12 @@ publications.
 Requires Python 3.11+.
 
 ```console
+pip install pyplotutil
+```
+
+The latest development version can be installed directly from GitHub:
+
+```console
 pip install git+https://github.com/hrshtst/pyplotutil.git
 ```
 
@@ -41,7 +47,7 @@ Interactive plotting with `plt.show()` needs a GUI backend, which is
 provided by the optional `gui` extra:
 
 ```console
-pip install "pyplotutil[gui] @ git+https://github.com/hrshtst/pyplotutil.git"
+pip install "pyplotutil[gui]"
 ```
 
 ## Quickstart
